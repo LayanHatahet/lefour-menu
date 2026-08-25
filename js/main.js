@@ -219,7 +219,7 @@ const urlLang = new URLSearchParams(location.search).get('lang');
 let lang = (urlLang && UI[urlLang]) ? urlLang : (localStorage.getItem('lefour-lang') || 'fr');
 
 const FILTER_ALL = { fr: 'Tout', en: 'All', ar: 'الكل' };
-const SIZES_HINT = { fr: 'options', en: 'options', ar: 'خيارات' };
+const SIZES_HINT = { fr: ['option', 'options'], en: ['option', 'options'], ar: ['خيار', 'خيارات'] };
 
 function t(key) { return UI[lang][key] ?? UI.fr[key] ?? key; }
 
@@ -239,39 +239,102 @@ function applyI18n() {
   buildTabs();
   buildFilters();
   renderMenu();
-  renderHours();
+  renderStatus();
+  wirePickupMsgs();
 }
 
 /* ───────────────── liens & coordonnées (INFO) ──────────── */
+const PICKUP_MSG = {
+  fr: 'Bonjour! Je voudrais passer une commande pour emporter.',
+  en: "Hi! I'd like to place a pickup order.",
+  ar: 'مرحبا! بدي اعمل طلب استلام من المحل.',
+};
+
+function waLink(msg) {
+  return `https://wa.me/${INFO.whatsapp}?text=${encodeURIComponent(msg)}`;
+}
+
 function wireInfo() {
   const tel = `tel:+${INFO.phoneRaw}`;
-  const wa = `https://wa.me/${INFO.whatsapp}`;
-  $('#qaCall').href = tel;
-  $('#qaWA').href = wa;
-  $('#qaMaps').href = INFO.maps;
-  $('#qaIG').href = INFO.instagram;
   $('#lnkUber').href = INFO.uber;
   $('#lnkDD').href = INFO.doordash;
-  $('#lnkWA').href = wa;
-  if (INFO.stripe) { const p = $('#lnkPay'); p.href = INFO.stripe; p.hidden = false; }
+  $('#lnkCall2').href = tel;
+  $('#osUber').href = INFO.uber;
+  $('#osDD').href = INFO.doordash;
+  $('#osCall').href = tel;
   $('#cAddr').textContent = INFO.address;
-  $('#cMaps').href = INFO.maps;
+  $('#cMaps').href = INFO.dir;
   $('#cCall').href = tel;
   $('#cMail').href = `mailto:${INFO.email}`;
   $('#cMail').textContent = INFO.email;
+  $('#lnkReview').href = INFO.review;
   $('#socIG').href = INFO.instagram;
   $('#socFB').href = INFO.facebook;
+  wirePickupMsgs();
 }
 
-function renderHours() {
-  const el = $('#hoursList');
-  if (!el) return;
-  el.innerHTML = HOURS.map(r => `
-    <div class="h-row${r.h ? '' : ' h-row--closed'}">
-      <span>${r.d[lang]}</span>
-      <i aria-hidden="true"></i>
-      <b>${r.h ? `‎${r.h}‎` : t('closed')}</b>
-    </div>`).join('');
+function wirePickupMsgs() {
+  const wa = waLink(PICKUP_MSG[lang] || PICKUP_MSG.fr);
+  $('#lnkWA').href = wa;
+  $('#osWA').href = wa;
+}
+
+/* ── statut ouvert/fermé en direct (heure de Montréal) ──── */
+function montrealNow() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Toronto', weekday: 'short',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const get = (type) => (parts.find(p => p.type === type) || {}).value;
+  const dayIdx = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[get('weekday')];
+  return { day: dayIdx, mins: parseInt(get('hour'), 10) % 24 * 60 + parseInt(get('minute'), 10) };
+}
+
+function renderStatus() {
+  const badge = $('#statusBadge');
+  if (!badge) return;
+  const { day, mins } = montrealNow();
+  const win = SCHEDULE[day];
+  const open = !!win && mins >= win[0] && mins < win[1];
+  badge.classList.toggle('status--open', open);
+  badge.classList.toggle('status--closed', !open);
+  $('#statusLabel').textContent = open ? t('statusOpen') : t('statusClosed');
+}
+
+/* ── traiteur → WhatsApp ────────────────────────────────── */
+const CATERING_TPL = {
+  fr: (v) => `Demande traiteur — Le Four\n\nNom : ${v.name}\nTéléphone : ${v.phone}\nDate de l'événement : ${v.date}\nNombre de personnes : ${v.guests}\n\nDétails :\n${v.details}`,
+  en: (v) => `Catering request — Le Four\n\nName: ${v.name}\nPhone: ${v.phone}\nEvent date: ${v.date}\nGuests: ${v.guests}\n\nDetails:\n${v.details}`,
+  ar: (v) => `طلب كاترينغ — لو فور\n\nالاسم: ${v.name}\nالهاتف: ${v.phone}\nتاريخ المناسبة: ${v.date}\nعدد الأشخاص: ${v.guests}\n\nالتفاصيل:\n${v.details}`,
+};
+
+function bindCatering() {
+  const form = $('#cateringForm');
+  if (!form) return;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const v = {
+      name: (fd.get('name') || '').toString().trim(),
+      phone: (fd.get('phone') || '').toString().trim(),
+      date: (fd.get('date') || '').toString(),
+      guests: (fd.get('guests') || '').toString(),
+      details: (fd.get('details') || '').toString().trim(),
+    };
+    const tpl = CATERING_TPL[lang] || CATERING_TPL.fr;
+    window.open(waLink(tpl(v)), '_blank', 'noopener');
+  });
+}
+
+/* ── feuille « Commander en ligne » ─────────────────────── */
+function bindOrderSheet() {
+  const os = $('#osheet');
+  const openBtn = $('#orderOpen');
+  const open = () => { os.classList.add('is-open'); os.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; };
+  const close = () => { os.classList.remove('is-open'); os.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; };
+  openBtn && openBtn.addEventListener('click', open);
+  $$('#osheet [data-oclose]').forEach(el => el.addEventListener('click', close));
+  addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 }
 
 function setLang(l) {
@@ -283,12 +346,14 @@ function setLang(l) {
 }
 
 /* ───────────────────── tabs / filters ──────────────────── */
+/* NB: la catégorie « pizzas » est masquée à la demande du client (2026-08) —
+   les données restent dans data.js; remettre la ligne pour la réactiver. */
 const CATS = [
   { key: 'manakish', kind: 'manakish', no: '01' },
-  { key: 'pizzas',   kind: 'pizza',    no: '02' },
-  { key: 'minis',    kind: 'mini',     no: '03' },
-  { key: 'mezze',    kind: 'mezze',    no: '04' },
-  { key: 'drinks',   kind: 'drink',    no: '05' },
+  /* { key: 'pizzas', kind: 'pizza', no: '02' }, */
+  { key: 'minis',    kind: 'mini',     no: '02' },
+  { key: 'mezze',    kind: 'mezze',    no: '03' },
+  { key: 'drinks',   kind: 'drink',    no: '04' },
 ];
 const titleKey = { manakish: 'manakishTitle', pizzas: 'pizzasTitle', minis: 'minisTitle', mezze: 'mezzeTitle', drinks: 'drinksTitle' };
 const subKey   = { manakish: 'manakishSub',   pizzas: 'pizzasSub',   minis: 'minisSub',   mezze: 'mezzeSub',   drinks: 'drinksSub' };
@@ -360,7 +425,7 @@ function renderMenu() {
             </span>
             <span class="card-end">
               ${item.price != null ? `<span class="card-price">${fmtPrice(item.price)}${c.kind === 'mini' ? ' <small>/12</small>' : ''}</span>` : ''}
-              ${extra ? `<span class="card-sizes">+${extra} ${SIZES_HINT[lang]}</span>` : ''}
+              ${extra ? `<span class="card-sizes">+${extra} ${SIZES_HINT[lang][extra > 1 ? 1 : 0]}</span>` : ''}
             </span>
           </button>`;
         }).join('')}
@@ -467,6 +532,9 @@ document.addEventListener('DOMContentLoaded', () => {
   wireInfo();
   applyI18n();
   bindStory();
+  bindCatering();
+  bindOrderSheet();
+  setInterval(renderStatus, 60000);
   $$('[data-setlang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.setlang)));
   $$('#sheet [data-close]').forEach(el => el.addEventListener('click', closeSheet));
   addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
