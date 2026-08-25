@@ -273,22 +273,67 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 [dir="rtl"] .halal { letter-spacing: .03em; font-size: .84rem; }
 .halal svg { width: 13px; height: 13px; }
 .cover-btns {
-  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
-  margin-top: 16px; width: 100%;
+  display: flex; gap: 12px; justify-content: center;
+  margin-top: 18px; width: 100%;
 }
-.cbig {
-  flex: 1 1 150px; max-width: 220px;
-  padding: 15px 18px; border-radius: 99px;
-  font-size: .74rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
-  text-align: center;
-  transition: transform .15s, background .25s, color .25s, border-color .25s;
+
+/* Deux « portes du four » : boutons en arche, ornement de la marque */
+.arch {
+  flex: 1 1 0; max-width: 176px; min-width: 0;
+  position: relative;
+  padding: 3px;
+  border-radius: 88px 88px 18px 18px;
+  transition: transform .22s var(--spring);
+  isolation: isolate;
 }
-[dir="rtl"] .cbig { letter-spacing: .02em; font-size: .9rem; }
-.cbig:active { transform: scale(.96); }
-.cbig--solid { background: var(--ivory); color: var(--herbs); }
-@media (hover: hover) { .cbig--solid:hover { background: #fff; } }
-.cbig--ghost { border: 1.5px solid rgba(244, 236, 223, .55); color: var(--ivory); background: rgba(28, 22, 17, .25); backdrop-filter: blur(6px); }
-@media (hover: hover) { .cbig--ghost:hover { border-color: var(--ivory); background: rgba(244, 236, 223, .12); } }
+.arch::after {           /* halo chaud sous le bouton */
+  content: ""; position: absolute; inset: auto 12% -8px 12%; height: 16px; z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(216, 188, 127, .45), transparent 70%);
+  opacity: 0; transition: opacity .35s;
+}
+.arch:active { transform: translateY(2px) scale(.975); }
+.arch:active::after, .arch:focus-visible::after { opacity: 1; }
+@media (hover: hover) {
+  .arch:hover { transform: translateY(-3px); }
+  .arch:hover::after { opacity: 1; }
+}
+
+.arch-in {
+  display: grid; justify-items: center; gap: 5px;
+  padding: 16px 12px 14px;
+  border-radius: 85px 85px 15px 15px;
+  height: 100%;
+}
+.arch-ic { width: 30px; height: 30px; }
+.arch-orn { width: 11px; height: 11px; opacity: .55; transition: transform .5s var(--ease); }
+@media (hover: hover) { .arch:hover .arch-orn { transform: rotate(45deg); } }
+.arch b {
+  font-size: .68rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+  line-height: 1.35; text-align: center;
+  text-wrap: balance;
+}
+[dir="rtl"] .arch b { letter-spacing: .01em; font-size: .82rem; }
+
+/* porte claire — pleine */
+.arch--solid { background: linear-gradient(180deg, #FBF6EC, #EFE2CC); color: var(--herbs); }
+.arch--solid .arch-in { border: 1px solid rgba(70, 82, 42, .22); }
+.arch--solid .arch-ic { color: var(--olive); }
+.arch--solid .arch-orn { color: var(--gold); opacity: .85; }
+
+/* porte sombre — vitrée, filet doré */
+.arch--ghost {
+  background: linear-gradient(180deg, rgba(244, 236, 223, .16), rgba(244, 236, 223, .05));
+  border: 1px solid rgba(216, 188, 127, .5);
+  backdrop-filter: blur(8px);
+  color: var(--ivory);
+}
+.arch--ghost .arch-in { border: 1px solid rgba(244, 236, 223, .18); }
+.arch--ghost .arch-ic { color: #E4CD96; }
+.arch--ghost .arch-orn { color: #E4CD96; }
+@media (hover: hover) {
+  .arch--ghost:hover { border-color: rgba(216, 188, 127, .9); background: linear-gradient(180deg, rgba(244, 236, 223, .24), rgba(244, 236, 223, .08)); }
+}
 
 /* ── order / delivery ──────────────────────────── */
 .sec-title {
@@ -589,6 +634,10 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
   .cover-top { margin-bottom: 0; align-self: start; }
   .cover-main { align-self: center; gap: 18px; }
   .cover-logo { width: min(320px, 24vw); }
+  .arch { max-width: 200px; }
+  .arch-in { padding: 20px 14px 17px; }
+  .arch-ic { width: 34px; height: 34px; }
+  .arch b { font-size: .72rem; }
   .cover-tagline { font-size: 1.3rem; }
   .cover-line { font-size: .68rem; }
   .cover-foot {
