@@ -454,11 +454,11 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 .cform { display: grid; gap: 10px; }
 .cform-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .cfield { display: grid; gap: 6px; }
-.cfield span {
+.cfield > span {
   font-size: .66rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
   color: var(--olive);
 }
-[dir="rtl"] .cfield span { letter-spacing: .02em; font-size: .78rem; }
+[dir="rtl"] .cfield > span { letter-spacing: .02em; font-size: .78rem; }
 .cfield input, .cfield textarea {
   font-family: inherit; font-size: .95rem; color: var(--ink);
   background: var(--paper);
@@ -685,3 +685,82 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 .osheet-card .sheet-name { text-align: center; margin-bottom: 4px; }
 .ochoice { display: grid; }
 .ochoice .og-label:first-child { margin-top: 6px; }
+
+/* ── photos sur les cartes ─────────────────────── */
+.card-art--photo { border-color: var(--hair); }
+.card-art--photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* photo dans la fiche */
+.sheet-photo {
+  width: 100%; max-width: 420px; margin: 2px auto 0;
+  border-radius: 18px; overflow: hidden;
+  border: 1px solid var(--hair); background: var(--paper);
+  aspect-ratio: 4 / 3;
+}
+.sheet-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── sélecteur d'articles (traiteur) ───────────── */
+.pick-hint { font-size: .72rem; opacity: .55; margin: -2px 0 4px; }
+.picker {
+  max-height: 268px; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--hair); border-radius: 14px;
+  background: var(--paper); padding: 4px 10px;
+}
+.pick-group + .pick-group { border-top: 1px solid var(--hair-soft); }
+.pick-cat {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--paper);
+  padding: 9px 0 5px;
+  font-size: .62rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--gold);
+}
+[dir="rtl"] .pick-cat { letter-spacing: .02em; font-size: .74rem; }
+.pick-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-top: 1px solid var(--hair-soft);
+}
+.pick-group .pick-row:first-of-type { border-top: 0; }
+.pick-name { flex: 1; min-width: 0; font-size: .88rem; }
+.pick-row.is-on .pick-name { font-weight: 700; color: var(--herbs); }
+.stepper { display: flex; align-items: center; gap: 2px; flex: none; }
+.stepper button {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--hair); background: var(--ivory);
+  font-size: 1rem; font-weight: 700; line-height: 1;
+  display: grid; place-items: center;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.stepper button:active { transform: scale(.9); }
+@media (hover: hover) { .stepper button:hover { border-color: var(--olive); color: var(--olive); } }
+.pick-q { min-width: 22px; text-align: center; font-weight: 800; font-size: .9rem; }
+.pick-row.is-on .pick-q { color: var(--herbs); }
+.pick-sum {
+  margin-top: 8px; font-size: .76rem; opacity: .55;
+  padding-inline-start: 2px;
+}
+.pick-sum.is-on { opacity: 1; color: var(--herbs); font-weight: 600; }
+
+/* ── galerie « Chez nous » ─────────────────────── */
+.gallery { margin: 26px 14px 0; border-top: 1px solid var(--hair); padding-top: 16px; }
+.gal-strip {
+  display: flex; gap: 10px;
+  overflow-x: auto; scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  padding-bottom: 4px;
+}
+.gal-strip::-webkit-scrollbar { display: none; }
+.gal-item {
+  flex: 0 0 auto; width: 72%; max-width: 300px;
+  aspect-ratio: 4 / 3;
+  border-radius: 18px; overflow: hidden;
+  border: 1px solid var(--hair-soft);
+  scroll-snap-align: center;
+  background: var(--paper);
+}
+.gal-item img { width: 100%; height: 100%; object-fit: cover; }
+
+@media (min-width: 1020px) {
+  .gallery { margin: 14px 36px 0; max-width: 1008px; }
+  .gal-item { width: 320px; }
+  .picker { max-height: 320px; }
+}

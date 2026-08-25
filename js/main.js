@@ -5,6 +5,10 @@
 
 'use strict';
 
+const NL = String.fromCharCode(10);
+const DASH = String.fromCharCode(8212);
+const JOINSAFE = (i) => String.fromCharCode(8226) + ' ' + i.name + ' ' + String.fromCharCode(215) + ' ' + i.q;
+
 const $  = (s, c = document) => c.querySelector(s);
 const $$ = (s, c = document) => [...c.querySelectorAll(s)];
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -215,6 +219,28 @@ function inkArt(item, kind) {
 }
 
 /* ─────────────────────────── i18n ──────────────────────── */
+let PHOTOS = { dishes: {}, gallery: [] };
+
+async function loadPhotos() {
+  try {
+    const r = await fetch('/api/photos', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    PHOTOS = { dishes: j.dishes || {}, gallery: j.gallery || [] };
+    renderMenu();
+    renderGallery();
+  } catch (e) { /* pas de photos : on garde les illustrations */ }
+}
+
+function renderGallery() {
+  const sec = $('#gallery'), strip = $('#galStrip');
+  if (!sec || !strip) return;
+  if (!PHOTOS.gallery.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  strip.innerHTML = PHOTOS.gallery.map(u =>
+    `<figure class="gal-item"><img src="${u}" alt="" loading="lazy"></figure>`).join('');
+}
+
 const urlLang = new URLSearchParams(location.search).get('lang');
 let lang = (urlLang && UI[urlLang]) ? urlLang : (localStorage.getItem('lefour-lang') || 'fr');
 
@@ -241,6 +267,8 @@ function applyI18n() {
   renderMenu();
   renderStatus();
   wirePickupMsgs();
+  renderPicker();
+  renderGallery();
 }
 
 /* ───────────────── liens & coordonnées (INFO) ──────────── */
@@ -303,10 +331,67 @@ function renderStatus() {
 
 /* ── traiteur → WhatsApp ────────────────────────────────── */
 const CATERING_TPL = {
-  fr: (v) => `Demande traiteur — Le Four\n\nNom : ${v.name}\nTéléphone : ${v.phone}\nDate de l'événement : ${v.date}\nNombre de personnes : ${v.guests}\n\nDétails :\n${v.details}`,
-  en: (v) => `Catering request — Le Four\n\nName: ${v.name}\nPhone: ${v.phone}\nEvent date: ${v.date}\nGuests: ${v.guests}\n\nDetails:\n${v.details}`,
-  ar: (v) => `طلب كاترينغ — لو فور\n\nالاسم: ${v.name}\nالهاتف: ${v.phone}\nتاريخ المناسبة: ${v.date}\nعدد الأشخاص: ${v.guests}\n\nالتفاصيل:\n${v.details}`,
+  fr: (v) => `Demande traiteur — Le Four\n\nNom : ${v.name}\nTéléphone : ${v.phone}\nDate de l'événement : ${v.date}\nNombre de personnes : ${v.guests}\n\nArticles :\n${v.items}\n\nNote :\n${v.details || DASH}`,
+  en: (v) => `Catering request — Le Four\n\nName: ${v.name}\nPhone: ${v.phone}\nEvent date: ${v.date}\nGuests: ${v.guests}\n\nItems:\n${v.items}\n\nNote:\n${v.details || DASH}`,
+  ar: (v) => `طلب كاترينغ — لو فور\n\nالاسم: ${v.name}\nالهاتف: ${v.phone}\nتاريخ المناسبة: ${v.date}\nعدد الأشخاص: ${v.guests}\n\nالأصناف:\n${v.items}\n\nملاحظة:\n${v.details || DASH}`,
 };
+
+/* ── sélecteur d'articles pour le traiteur ──────────────── */
+const PICK = new Map();
+
+function renderPicker() {
+  const host = $('#cateringPicker');
+  if (!host) return;
+  host.innerHTML = CATS.map(c => `
+    <div class="pick-group">
+      <p class="pick-cat">${t(titleKey[c.key])}</p>
+      ${MENU[c.key].map(it => {
+        const q = PICK.get(it.id) || 0;
+        return `<div class="pick-row${q ? ' is-on' : ''}" data-pid="${it.id}">
+          <span class="pick-name">${it.name[lang]}</span>
+          <span class="stepper">
+            <button type="button" data-step="-1" aria-label="-">−</button>
+            <b class="pick-q">${q}</b>
+            <button type="button" data-step="1" aria-label="+">+</button>
+          </span>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+
+  $$('.pick-row', host).forEach(row => {
+    $$('[data-step]', row).forEach(btn => btn.addEventListener('click', () => {
+      const id = row.dataset.pid;
+      const next = Math.max(0, (PICK.get(id) || 0) + Number(btn.dataset.step));
+      if (next) PICK.set(id, next); else PICK.delete(id);
+      $('.pick-q', row).textContent = next;
+      row.classList.toggle('is-on', !!next);
+      updatePickSummary();
+    }));
+  });
+  updatePickSummary();
+}
+
+function pickedList() {
+  const out = [];
+  for (const c of CATS) {
+    for (const it of MENU[c.key]) {
+      const q = PICK.get(it.id);
+      if (q) out.push({ name: it.name[lang], q });
+    }
+  }
+  return out;
+}
+
+function updatePickSummary() {
+  const el = $('#pickSummary');
+  if (!el) return;
+  const list = pickedList();
+  const total = list.reduce((n, i) => n + i.q, 0);
+  el.textContent = list.length
+    ? list.map(i => `${i.name} × ${i.q}`).join(' · ') + `  (${total})`
+    : t('cartEmpty');
+  el.classList.toggle('is-on', !!list.length);
+}
 
 function bindCatering() {
   const form = $('#cateringForm');
@@ -320,6 +405,7 @@ function bindCatering() {
       date: (fd.get('date') || '').toString(),
       guests: (fd.get('guests') || '').toString(),
       details: (fd.get('details') || '').toString().trim(),
+      items: pickedList().map(i => JOINSAFE(i)).join(NL) || DASH,
     };
     const tpl = CATERING_TPL[lang] || CATERING_TPL.fr;
     window.open(waLink(tpl(v)), '_blank', 'noopener');
@@ -417,7 +503,7 @@ function renderMenu() {
           const extra = sizeCount(item, c.kind);
           return `
           <button type="button" class="card" data-kind="${c.kind}" data-cat="${c.key}" data-id="${item.id}" data-tags="${(item.tags || []).join(',')}">
-            <span class="card-art">${inkArt(item, c.kind)}</span>
+            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${PHOTOS.dishes[item.id]}" alt="" loading="lazy">` : inkArt(item, c.kind)}</span>
             <span class="card-mid">
               <span class="card-name">${item.name[lang]}</span>
               <span class="card-desc">${item.desc[lang] || ''}</span>
@@ -466,6 +552,10 @@ let lastFocus = null;
 
 function openSheet(item, kind) {
   lastFocus = document.activeElement;
+  const photo = PHOTOS.dishes[item.id];
+  const pf = $('#sheetPhoto');
+  if (photo) { $('#sheetPhotoImg').src = photo; pf.hidden = false; $('#sheetArt').hidden = true; }
+  else { pf.hidden = true; $('#sheetArt').hidden = false; }
   $('#sheetArt').innerHTML = inkArt(item, kind);
   $('#sheetName').textContent = item.name[lang];
   $('#sheetDesc').textContent = item.desc[lang] || '';
@@ -534,6 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindStory();
   bindCatering();
   bindOrderSheet();
+  loadPhotos();
   setInterval(renderStatus, 60000);
   $$('[data-setlang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.setlang)));
   $$('#sheet [data-close]').forEach(el => el.addEventListener('click', closeSheet));
