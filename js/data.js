@@ -618,11 +618,11 @@ const INFO = {
   stripe: '',
 };
 
-/* Horaires machine (heure de Montréal) — fournis par le client :
-   mar–sam 6 h 30 à 17 h, ven jusqu'à 15 h, lundi fermé.
-   Dimanche : fermé (à confirmer). Index: 0=dim … 6=sam. [ouverture, fermeture] en minutes. */
+/* Horaires machine (heure de Montreal) — confirmes par le client :
+   dim 6 h 30 a 15 h · lun ferme · mar-jeu et sam 6 h 30 a 17 h · ven 6 h 30 a 15 h.
+   Index: 0=dim … 6=sam. [ouverture, fermeture] en minutes depuis minuit. */
 const SCHEDULE = {
-  0: null,
+  0: [390, 900],
   1: null,
   2: [390, 1020],
   3: [390, 1020],
