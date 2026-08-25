@@ -160,9 +160,14 @@ $('#gateForm').addEventListener('submit', async (e) => {
     sessionStorage.setItem('lefour-admin', KEY);
     showApp(); await load();
   } catch (e2) {
-    if (/unauthorized/i.test(e2.message)) { err.textContent = 'Mot de passe incorrect.'; err.hidden = false; return; }
-    if (/bad request/i.test(e2.message)) { /* clé valide */ sessionStorage.setItem('lefour-admin', KEY); showApp(); await load(); return; }
-    err.textContent = e2.message; err.hidden = false;
+    /* seul « unauthorized » signifie un mauvais mot de passe ;
+       toute autre erreur (stockage pas encore activé, requête vide…) = clé valide */
+    if (/unauthorized/i.test(e2.message)) {
+      err.textContent = 'Mot de passe incorrect.'; err.hidden = false; return;
+    }
+    sessionStorage.setItem('lefour-admin', KEY);
+    showApp();
+    try { await load(); } catch (e3) { toast('Erreur : ' + e3.message); }
   }
 });
 
