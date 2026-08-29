@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr" dir="ltr">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>Le Four — Tableau de bord photos</title>
+  <title>Le Four — Photo Dashboard</title>
   <link rel="icon" type="image/png" href="assets/logo_rollpin.png">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Manrope:wght@300..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/admin.css">
@@ -13,17 +13,17 @@
 
   <header class="ah">
     <img src="assets/logo_wordmark.png" alt="Le Four">
-    <span class="ah-tag">Tableau de bord — photos</span>
-    <button id="logout" class="mini" hidden>Sortir</button>
+    <span class="ah-tag">Photo dashboard</span>
+    <button id="logout" class="mini" hidden>Log out</button>
   </header>
 
   <!-- gate -->
   <section class="gate" id="gate">
-    <h1>Accès réservé</h1>
-    <p class="muted">Entrez le mot de passe administrateur.</p>
+    <h1>Restricted access</h1>
+    <p class="muted">Enter the admin password.</p>
     <form id="gateForm">
-      <input type="password" id="pw" autocomplete="current-password" placeholder="Mot de passe" required>
-      <button type="submit" class="solid">Entrer</button>
+      <input type="password" id="pw" autocomplete="current-password" placeholder="Password" required>
+      <button type="submit" class="solid">Enter</button>
     </form>
     <p class="err" id="gateErr" hidden></p>
   </section>
@@ -33,18 +33,18 @@
     <div class="notice" id="notice" hidden></div>
 
     <section class="block">
-      <h2>Galerie du restaurant</h2>
-      <p class="muted">Les photos de l’intérieur, affichées dans la section « Chez nous ».</p>
+      <h2>Restaurant gallery</h2>
+      <p class="muted">Photos of the shop, shown in the “Chez nous” section of the menu.</p>
       <label class="drop" id="galDrop">
         <input type="file" accept="image/*" multiple hidden id="galInput">
-        <span>+ Ajouter des photos</span>
+        <span>+ Add photos</span>
       </label>
       <div class="gal" id="galList"></div>
     </section>
 
     <section class="block">
-      <h2>Photos des plats</h2>
-      <p class="muted">Une photo par plat. Elle apparaît sur la carte et dans la fiche du plat.</p>
+      <h2>Dish photos</h2>
+      <p class="muted">One photo per dish. It shows on the menu card and in the dish details.</p>
       <div id="dishList"></div>
     </section>
   </main>

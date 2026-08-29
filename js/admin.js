@@ -1,5 +1,5 @@
-/* Tableau de bord photos — Le Four
-   Redimensionne les images côté navigateur puis les envoie à /api/upload. */
+/* Photo dashboard — Le Four
+   Resizes images in the browser, then sends them to /api/upload. */
 'use strict';
 
 const $ = (s, c = document) => c.querySelector(s);
@@ -7,10 +7,10 @@ const $$ = (s, c = document) => [...c.querySelectorAll(s)];
 
 const CATS = [
   { key: 'manakish', label: 'Manakish' },
-  { key: 'pizzas',   label: 'Pizzas (masquées sur le site)' },
-  { key: 'minis',    label: 'Bouchées' },
-  { key: 'mezze',    label: 'Mezzé' },
-  { key: 'drinks',   label: 'Boissons' },
+  { key: 'pizzas',   label: 'Pizzas (hidden on the site)' },
+  { key: 'minis',    label: 'Bites' },
+  { key: 'mezze',    label: 'Mezze' },
+  { key: 'drinks',   label: 'Drinks' },
 ];
 
 let KEY = sessionStorage.getItem('lefour-admin') || '';
@@ -64,7 +64,7 @@ async function load() {
   const note = $('#notice');
   if (DATA.configured === false) {
     note.hidden = false;
-    note.innerHTML = "Le stockage des photos n’est pas encore activé. Dans Vercel : <b>Storage → Create Database → Blob</b>, connectez-le au projet <code>lefour</code>, puis redéployez. (La variable <code>BLOB_READ_WRITE_TOKEN</code> s’ajoute toute seule.)";
+    note.innerHTML = "Photo storage is not set up yet. In Vercel: <b>Storage → Create Database → Blob</b>, connect it to the <code>lefour</code> project, then redeploy. (The <code>BLOB_READ_WRITE_TOKEN</code> variable is added automatically.)";
   } else {
     note.hidden = true;
   }
@@ -72,15 +72,15 @@ async function load() {
   renderDishes();
 }
 
-/* ── galerie ────────────────────────────────────────────── */
+/* ── gallery ────────────────────────────────────────────── */
 function renderGallery() {
   $('#galList').innerHTML = DATA.gallery.map(u => `
-    <figure><img src="${u}" alt="" loading="lazy"><button data-del="${u}" title="Supprimer">✕</button></figure>
-  `).join('') || '<p class="muted">Aucune photo pour le moment.</p>';
+    <figure><img src="${u}" alt="" loading="lazy"><button data-del="${u}" title="Delete">✕</button></figure>
+  `).join('') || '<p class="muted">No photos yet.</p>';
   $$('#galList [data-del]').forEach(b => b.addEventListener('click', () => removePhoto(b.dataset.del)));
 }
 
-/* ── plats ──────────────────────────────────────────────── */
+/* ── dishes ─────────────────────────────────────────────── */
 function renderDishes() {
   const host = $('#dishList');
   host.innerHTML = CATS.map(c => {
@@ -89,11 +89,11 @@ function renderDishes() {
     return `<p class="cat-h">${c.label}</p>` + items.map(it => {
       const url = DATA.dishes[it.id];
       return `<div class="row" data-id="${it.id}">
-        <span class="thumb">${url ? `<img src="${url}" alt="" loading="lazy">` : 'aucune'}</span>
-        <span class="rname">${it.name.fr}<small>${it.id}</small></span>
+        <span class="thumb">${url ? `<img src="${url}" alt="" loading="lazy">` : 'none'}</span>
+        <span class="rname">${it.name.en}<small>${it.id}</small></span>
         <span class="ract">
-          <label>${url ? 'Changer' : 'Ajouter'}<input type="file" accept="image/*" hidden data-dish="${it.id}"></label>
-          ${url ? `<button class="del" data-deldish="${url}">Retirer</button>` : ''}
+          <label>${url ? 'Replace' : 'Add'}<input type="file" accept="image/*" hidden data-dish="${it.id}"></label>
+          ${url ? `<button class="del" data-deldish="${url}">Remove</button>` : ''}
         </span>
       </div>`;
     }).join('');
@@ -115,34 +115,34 @@ async function uploadPhoto(kind, file, id) {
   const app = $('#app');
   app.classList.add('busy');
   try {
-    toast('Traitement de l’image…');
+    toast('Processing image…');
     const dataUrl = await shrink(file);
     await api('/api/upload', { method: 'POST', body: JSON.stringify({ kind, id, dataUrl }) });
-    toast('Photo enregistrée ✓');
+    toast('Photo saved ✓');
     await load();
   } catch (e) {
-    toast('Erreur : ' + e.message);
+    toast('Error: ' + e.message);
   } finally {
     app.classList.remove('busy');
   }
 }
 
 async function removePhoto(url) {
-  if (!confirm('Supprimer cette photo ?')) return;
+  if (!confirm('Delete this photo?')) return;
   const app = $('#app');
   app.classList.add('busy');
   try {
     await api('/api/photos', { method: 'POST', body: JSON.stringify({ action: 'delete', urls: [url] }) });
-    toast('Photo supprimée');
+    toast('Photo deleted');
     await load();
   } catch (e) {
-    toast('Erreur : ' + e.message);
+    toast('Error: ' + e.message);
   } finally {
     app.classList.remove('busy');
   }
 }
 
-/* ── porte d’entrée ─────────────────────────────────────── */
+/* ── login gate ─────────────────────────────────────────── */
 function showApp() {
   $('#gate').hidden = true;
   $('#app').hidden = false;
@@ -155,19 +155,19 @@ $('#gateForm').addEventListener('submit', async (e) => {
   const err = $('#gateErr');
   err.hidden = true;
   try {
-    /* vérifie la clé avec une opération protégée inoffensive */
+    /* check the key with a harmless protected call */
     await api('/api/photos', { method: 'POST', body: JSON.stringify({ action: 'delete', urls: [] }) });
     sessionStorage.setItem('lefour-admin', KEY);
     showApp(); await load();
   } catch (e2) {
-    /* seul « unauthorized » signifie un mauvais mot de passe ;
-       toute autre erreur (stockage pas encore activé, requête vide…) = clé valide */
+    /* only "unauthorized" means a wrong password; any other error
+       (storage not set up, empty request…) still means the key is valid */
     if (/unauthorized/i.test(e2.message)) {
-      err.textContent = 'Mot de passe incorrect.'; err.hidden = false; return;
+      err.textContent = 'Incorrect password.'; err.hidden = false; return;
     }
     sessionStorage.setItem('lefour-admin', KEY);
     showApp();
-    try { await load(); } catch (e3) { toast('Erreur : ' + e3.message); }
+    try { await load(); } catch (e3) { toast('Error: ' + e3.message); }
   }
 });
 
@@ -182,4 +182,4 @@ $('#galInput').addEventListener('change', async (e) => {
   e.target.value = '';
 });
 
-if (KEY) { showApp(); load().catch(e => toast('Erreur : ' + e.message)); }
+if (KEY) { showApp(); load().catch(e => toast('Error: ' + e.message)); }
