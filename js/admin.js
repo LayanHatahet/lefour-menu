@@ -70,6 +70,7 @@ async function load() {
   }
   renderGallery();
   renderDishes();
+  await loadSettings();
 }
 
 /* ── gallery ────────────────────────────────────────────── */
@@ -142,8 +143,125 @@ async function removePhoto(url) {
   }
 }
 
+
+/* ── settings: SEO, analytics, business, social ─────────── */
+let SETTINGS = null;
+let DIRTY = false;
+
+const TRACKED_EVENTS = [
+  ['view_menu', 'View Menu button'],
+  ['order_online', 'Order Online button'],
+  ['uber_eats_click', 'Uber Eats'],
+  ['doordash_click', 'DoorDash'],
+  ['whatsapp_click', 'WhatsApp'],
+  ['call_click', 'Call'],
+  ['directions_click', 'Directions'],
+  ['catering_submit', 'Catering inquiry sent'],
+  ['view_item', 'Dish opened'],
+  ['review_click', 'Google review'],
+  ['social_instagram', 'Instagram'],
+  ['social_facebook', 'Facebook'],
+  ['social_tiktok', 'TikTok'],
+  ['language_change', 'Language switch'],
+];
+
+function getPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+function setPath(obj, path, val) {
+  const keys = path.split('.');
+  let o = obj;
+  for (let i = 0; i < keys.length - 1; i++) { if (typeof o[keys[i]] !== 'object' || o[keys[i]] === null) o[keys[i]] = {}; o = o[keys[i]]; }
+  o[keys[keys.length - 1]] = val;
+}
+
+function markDirty() {
+  DIRTY = true;
+  const bar = $('#saveBar');
+  if (bar) { bar.hidden = false; $('#saveHint').textContent = 'Unsaved changes'; }
+}
+
+function fillSettingsForm() {
+  $$('[data-set]').forEach(el => {
+    const v = getPath(SETTINGS, el.dataset.set);
+    el.value = (v == null ? '' : v);
+    updateCount(el);
+    el.addEventListener('input', () => { setPath(SETTINGS, el.dataset.set, el.value); updateCount(el); markDirty(); });
+  });
+  const ev = $('#evList');
+  if (ev) ev.innerHTML = TRACKED_EVENTS.map(([k, label]) =>
+    `<div class="ev"><code>${k}</code><span>${label}</span></div>`).join('');
+}
+
+function updateCount(el) {
+  const c = el.parentElement && el.parentElement.querySelector('.count');
+  if (!c || !el.maxLength || el.maxLength < 0) return;
+  const n = (el.value || '').length;
+  c.textContent = n + ' / ' + el.maxLength;
+  c.classList.toggle('warn', n > el.maxLength - 10);
+}
+
+function renderAlts() {
+  const host = $('#altList');
+  if (!host) return;
+  const rows = [];
+  CATS.forEach(c => (MENU[c.key] || []).forEach(it => {
+    if (!DATA.dishes[it.id]) return;
+    rows.push(`<div class="row"><span class="thumb"><img src="${DATA.dishes[it.id]}" alt="" loading="lazy"></span>
+      <span class="rname">${it.name.en}<small>${it.id}</small></span>
+      <input class="altin" data-set="alt.dish:${it.id}" placeholder="Describe this photo…"></div>`);
+  }));
+  DATA.gallery.forEach((u, i) => {
+    rows.push(`<div class="row"><span class="thumb"><img src="${u}" alt="" loading="lazy"></span>
+      <span class="rname">Gallery photo ${i + 1}</span>
+      <input class="altin" data-set="alt.gallery:${u}" placeholder="Describe this photo…"></div>`);
+  });
+  host.innerHTML = rows.join('') || '<p class="muted">Upload photos first — then you can describe them here.</p>';
+  $$('#altList [data-set]').forEach(el => {
+    const v = getPath(SETTINGS, el.dataset.set);
+    el.value = (v == null ? '' : v);
+    el.addEventListener('input', () => { setPath(SETTINGS, el.dataset.set, el.value); markDirty(); });
+  });
+}
+
+async function loadSettings() {
+  const j = await api('/api/settings');
+  SETTINGS = j.settings || {};
+  fillSettingsForm();
+  renderAlts();
+}
+
+async function saveSettings() {
+  const btn = $('#saveBtn');
+  btn.disabled = true;
+  $('#saveHint').textContent = 'Saving…';
+  try {
+    await api('/api/settings', { method: 'POST', body: JSON.stringify({ settings: SETTINGS }) });
+    DIRTY = false;
+    $('#saveHint').textContent = 'Saved ✓';
+    toast('Settings saved ✓');
+    setTimeout(() => { if (!DIRTY) $('#saveBar').hidden = true; }, 1600);
+  } catch (e) {
+    $('#saveHint').textContent = 'Error';
+    toast('Error: ' + e.message);
+  } finally { btn.disabled = false; }
+}
+
+function bindTabs() {
+  $$('.atab').forEach(b => b.addEventListener('click', () => {
+    $$('.atab').forEach(x => x.classList.toggle('is-on', x === b));
+    $$('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + b.dataset.tab; });
+    if (b.dataset.tab === 'seo') renderAlts();
+  }));
+  const sb = $('#saveBtn');
+  if (sb) sb.addEventListener('click', saveSettings);
+  addEventListener('beforeunload', (e) => { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
+}
+
 /* ── login gate ─────────────────────────────────────────── */
+let TABS_BOUND = false;
 function showApp() {
+  if (!TABS_BOUND) { TABS_BOUND = true; bindTabs(); }
   $('#gate').hidden = true;
   $('#app').hidden = false;
   $('#logout').hidden = false;

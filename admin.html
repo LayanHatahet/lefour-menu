@@ -32,6 +32,79 @@
   <main id="app" hidden>
     <div class="notice" id="notice" hidden></div>
 
+    <nav class="tabs" id="adminTabs">
+      <button class="atab is-on" data-tab="photos">Photos</button>
+      <button class="atab" data-tab="seo">SEO</button>
+      <button class="atab" data-tab="analytics">Analytics</button>
+      <button class="atab" data-tab="business">Business &amp; social</button>
+    </nav>
+
+    <div class="pane" id="pane-seo" hidden>
+      <section class="block">
+        <h2>Search engine listing</h2>
+        <p class="muted">What Google and social apps show. Leave empty to keep the built-in defaults.</p>
+        <div class="grid2">
+          <label class="fld"><span>SEO title — French</span><input data-set="seoTitle.fr" maxlength="70" placeholder="Le Four — Boulangerie…"><small class="count"></small></label>
+          <label class="fld"><span>SEO title — English</span><input data-set="seoTitle.en" maxlength="70"><small class="count"></small></label>
+          <label class="fld"><span>SEO title — Arabic</span><input data-set="seoTitle.ar" maxlength="70" dir="rtl"><small class="count"></small></label>
+          <label class="fld"><span>Keywords (comma separated)</span><input data-set="keywords" placeholder="boulangerie Pierrefonds, manakish Montréal…"></label>
+        </div>
+        <label class="fld"><span>Meta description — French</span><textarea data-set="seoDesc.fr" rows="2" maxlength="165"></textarea><small class="count"></small></label>
+        <label class="fld"><span>Meta description — English</span><textarea data-set="seoDesc.en" rows="2" maxlength="165"></textarea><small class="count"></small></label>
+        <label class="fld"><span>Meta description — Arabic</span><textarea data-set="seoDesc.ar" rows="2" maxlength="165" dir="rtl"></textarea><small class="count"></small></label>
+        <label class="fld"><span>Social share image URL (1200×630)</span><input data-set="ogImage" placeholder="https://lefour.vercel.app/assets/og-cover.jpg"></label>
+      </section>
+
+      <section class="block">
+        <h2>Image alt text</h2>
+        <p class="muted">Describe each photo for Google Images and screen readers.</p>
+        <div id="altList"></div>
+      </section>
+    </div>
+
+    <div class="pane" id="pane-analytics" hidden>
+      <section class="block">
+        <h2>Tracking IDs</h2>
+        <p class="muted">Paste an ID and it goes live on the site immediately — no redeploy needed. Leave empty to disable.</p>
+        <div class="grid2">
+          <label class="fld"><span>Google Analytics 4 — Measurement ID</span><input data-set="ga4" placeholder="G-XXXXXXXXXX"></label>
+          <label class="fld"><span>Google Tag Manager — Container ID</span><input data-set="gtm" placeholder="GTM-XXXXXXX"></label>
+          <label class="fld"><span>Meta Pixel ID</span><input data-set="metaPixel" placeholder="1234567890123456"></label>
+          <label class="fld"><span>Microsoft Clarity — Project ID</span><input data-set="clarity" placeholder="abcdefghij"></label>
+          <label class="fld"><span>Google Search Console — verification code</span><input data-set="gscVerify" placeholder="google-site-verification content value"></label>
+        </div>
+      </section>
+      <section class="block">
+        <h2>Events tracked automatically</h2>
+        <p class="muted">Every one of these fires to GA4, GTM, Meta Pixel and Clarity, with the campaign source attached.</p>
+        <div class="evlist" id="evList"></div>
+      </section>
+    </div>
+
+    <div class="pane" id="pane-business" hidden>
+      <section class="block">
+        <h2>Business info (local SEO)</h2>
+        <p class="muted">Keep this identical to your Google Business Profile — name, address, phone.</p>
+        <div class="grid2">
+          <label class="fld"><span>Business name</span><input data-set="bizName" placeholder="Boulangerie Le Four"></label>
+          <label class="fld"><span>Phone</span><input data-set="phone" placeholder="(514) 624-3330"></label>
+          <label class="fld"><span>Email</span><input data-set="email" placeholder="info@lefourboulangerie.com"></label>
+          <label class="fld"><span>Address</span><input data-set="address" placeholder="15708 Boul. de Pierrefonds…"></label>
+        </div>
+      </section>
+      <section class="block">
+        <h2>Social accounts</h2>
+        <div class="grid2">
+          <label class="fld"><span>Instagram URL</span><input data-set="instagram" placeholder="https://www.instagram.com/lefourboulangerie/"></label>
+          <label class="fld"><span>Facebook URL</span><input data-set="facebook" placeholder="https://www.facebook.com/boulangerielefour/"></label>
+          <label class="fld"><span>TikTok URL</span><input data-set="tiktok" placeholder="https://www.tiktok.com/@…"></label>
+        </div>
+        <p class="muted">The TikTok icon appears on the site as soon as you add a link.</p>
+      </section>
+    </div>
+
+    <div class="pane" id="pane-photos">
+
     <section class="block">
       <h2>Restaurant gallery</h2>
       <p class="muted">Photos of the shop, shown in the “Chez nous” section of the menu.</p>
@@ -47,7 +120,13 @@
       <p class="muted">One photo per dish. It shows on the menu card and in the dish details.</p>
       <div id="dishList"></div>
     </section>
+    </div><!-- /pane-photos -->
   </main>
+
+  <div class="savebar" id="saveBar" hidden>
+    <span id="saveHint">Unsaved changes</span>
+    <button class="solid" id="saveBtn">Save changes</button>
+  </div>
 
   <div class="toast" id="toast" hidden></div>
 

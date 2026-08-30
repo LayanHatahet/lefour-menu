@@ -221,6 +221,13 @@ function inkArt(item, kind) {
 /* ─────────────────────────── i18n ──────────────────────── */
 let PHOTOS = { dishes: {}, gallery: [] };
 
+/* texte alternatif éditable depuis le tableau de bord (SEO images) */
+function altFor(key, fallback) {
+  const s = window.LF_SETTINGS;
+  const v = s && s.alt ? s.alt[key] : '';
+  return (v && String(v).trim()) || fallback || '';
+}
+
 async function loadPhotos() {
   try {
     const r = await fetch('/api/photos', { cache: 'no-store' });
@@ -256,12 +263,40 @@ function fmtPrice(n) {
   return `‎$${s}‎`;
 }
 
+function applySeo() {
+  const st = window.LF_SETTINGS;
+  if (!st) return;
+  const pick = (o) => (o && (o[lang] || o.fr || o.en)) || '';
+  const title = pick(st.seoTitle), desc = pick(st.seoDesc);
+  const set = (sel, attr, val) => { const el = document.querySelector(sel); if (el && val) el.setAttribute(attr, val); };
+  if (title) { document.title = title; set('meta[property="og:title"]', 'content', title); set('meta[name="twitter:title"]', 'content', title); }
+  if (desc) { set('meta[name="description"]', 'content', desc); set('meta[property="og:description"]', 'content', desc); set('meta[name="twitter:description"]', 'content', desc); }
+  if (st.keywords) set('meta[name="keywords"]', 'content', st.keywords);
+  if (st.ogImage) { set('meta[property="og:image"]', 'content', st.ogImage); set('meta[name="twitter:image"]', 'content', st.ogImage); }
+  const ld = document.getElementById('ldBusiness');
+  if (ld) {
+    try {
+      const j = JSON.parse(ld.textContent);
+      if (st.bizName) j.name = st.bizName;
+      if (st.phone) j.telephone = st.phone;
+      if (st.email) j.email = st.email;
+      if (st.ogImage) j.image = st.ogImage;
+      const sameAs = [st.instagram, st.facebook, st.tiktok].filter(Boolean);
+      if (sameAs.length) j.sameAs = sameAs;
+      ld.textContent = JSON.stringify(j);
+    } catch (e) { /* garder le JSON-LD statique */ }
+  }
+  const loc = { fr: 'fr_CA', en: 'en_CA', ar: 'ar_AR' }[lang] || 'fr_CA';
+  set('meta[property="og:locale"]', 'content', loc);
+}
+
 function applyI18n() {
   document.documentElement.lang = lang;
   document.documentElement.dir = UI[lang].dir;
   document.body.dataset.lang = lang;
   $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   $$('.lang-switch button').forEach(b => b.classList.toggle('is-active', b.dataset.setlang === lang));
+  applySeo();
   buildTabs();
   buildFilters();
   renderMenu();
@@ -270,6 +305,8 @@ function applyI18n() {
   renderPicker();
   renderGallery();
 }
+
+const track = (e, p) => { if (window.lfTrack) window.lfTrack(e, p || {}); };
 
 /* ───────────────── liens & coordonnées (INFO) ──────────── */
 const PICKUP_MSG = {
@@ -298,6 +335,21 @@ function wireInfo() {
   $('#lnkReview').href = INFO.review;
   $('#socIG').href = INFO.instagram;
   $('#socFB').href = INFO.facebook;
+  document.addEventListener('lf-settings', (e) => {
+    const st = e.detail || {};
+    if (st.instagram) $('#socIG').href = st.instagram;
+    if (st.facebook) $('#socFB').href = st.facebook;
+    const tt = $('#socTT');
+    if (tt && st.tiktok) { tt.href = st.tiktok; tt.hidden = false; }
+    if (st.phone) {
+      const tel2 = 'tel:' + String(st.phone).replace(/[^+0-9]/g, '');
+      ['#lnkCall2', '#osCall', '#cCall'].forEach(sel => { const el = $(sel); if (el) el.href = tel2; });
+    }
+    if (st.address) { const a = $('#cAddr'); if (a) a.textContent = st.address; }
+    if (st.email) { const m = $('#cMail'); if (m) { m.href = 'mailto:' + st.email; m.textContent = st.email; } }
+    applySeo();
+    renderMenu();
+  });
   wirePickupMsgs();
 }
 
@@ -408,6 +460,7 @@ function bindCatering() {
       items: pickedList().map(i => JOINSAFE(i)).join(NL) || DASH,
     };
     const tpl = CATERING_TPL[lang] || CATERING_TPL.fr;
+    track('catering_submit', { guests: v.guests });
     window.open(waLink(tpl(v)), '_blank', 'noopener');
   });
 }
@@ -418,7 +471,7 @@ function bindOrderSheet() {
   const openBtn = $('#orderOpen');
   const open = () => { os.classList.add('is-open'); os.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; };
   const close = () => { os.classList.remove('is-open'); os.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; };
-  openBtn && openBtn.addEventListener('click', open);
+  openBtn && openBtn.addEventListener('click', () => { track('order_online'); open(); });
   $$('#osheet [data-oclose]').forEach(el => el.addEventListener('click', close));
   addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 }
@@ -426,6 +479,7 @@ function bindOrderSheet() {
 function setLang(l) {
   if (!UI[l]) return;
   lang = l;
+  track('language_change', { language: l });
   localStorage.setItem('lefour-lang', l);
   closeSheet();
   applyI18n();
@@ -503,7 +557,7 @@ function renderMenu() {
           const extra = sizeCount(item, c.kind);
           return `
           <button type="button" class="card" data-kind="${c.kind}" data-cat="${c.key}" data-id="${item.id}" data-tags="${(item.tags || []).join(',')}">
-            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${PHOTOS.dishes[item.id]}" alt="" loading="lazy">` : inkArt(item, c.kind)}</span>
+            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${PHOTOS.dishes[item.id]}" alt="${altFor('dish:' + item.id, item.name[lang] + ' — Boulangerie Le Four')}" loading="lazy">` : inkArt(item, c.kind)}</span>
             <span class="card-mid">
               <span class="card-name">${item.name[lang]}</span>
               <span class="card-desc">${item.desc[lang] || ''}</span>
@@ -552,9 +606,11 @@ let lastFocus = null;
 
 function openSheet(item, kind) {
   lastFocus = document.activeElement;
+  track('view_item', { item_name: (item.name && item.name.en) || item.id, item_id: item.id, item_category: kind });
   const photo = PHOTOS.dishes[item.id];
   const pf = $('#sheetPhoto');
-  if (photo) { $('#sheetPhotoImg').src = photo; pf.hidden = false; $('#sheetArt').hidden = true; }
+  if (photo) { $('#sheetPhotoImg').src = photo;
+    $('#sheetPhotoImg').alt = altFor('dish:' + item.id, item.name[lang] + ' — Boulangerie Le Four'); pf.hidden = false; $('#sheetArt').hidden = true; }
   else { pf.hidden = true; $('#sheetArt').hidden = false; }
   $('#sheetArt').innerHTML = inkArt(item, kind);
   $('#sheetName').textContent = item.name[lang];
