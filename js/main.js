@@ -244,8 +244,8 @@ function renderGallery() {
   if (!sec || !strip) return;
   if (!PHOTOS.gallery.length) { sec.hidden = true; return; }
   sec.hidden = false;
-  strip.innerHTML = PHOTOS.gallery.map(u =>
-    `<figure class="gal-item"><img src="${u}" alt="" loading="lazy"></figure>`).join('');
+  strip.innerHTML = PHOTOS.gallery.map((u, i) =>
+    `<figure class="gal-item"><img src="${u}" alt="${altFor('gallery:' + u, 'Boulangerie Le Four — Pierrefonds')}" loading="lazy" decoding="async"></figure>`).join('');
 }
 
 const urlLang = new URLSearchParams(location.search).get('lang');
@@ -261,6 +261,34 @@ function fmtPrice(n) {
   const s = Number.isInteger(n) ? String(n) : n.toFixed(2);
   if (lang === 'fr') return `${s.replace('.', ',')} $`;
   return `‎$${s}‎`;
+}
+
+
+/* ── données structurées du menu (rich results) ─────────── */
+function injectMenuSchema() {
+  try {
+    const secs = CATS.map(c => ({
+      '@type': 'MenuSection',
+      name: t(titleKey[c.key]),
+      hasMenuItem: (MENU[c.key] || []).map(it => {
+        const item = { '@type': 'MenuItem', name: it.name[lang], description: it.desc[lang] || '' };
+        if (it.price != null) item.offers = { '@type': 'Offer', price: String(it.price), priceCurrency: 'CAD' };
+        if (it.tags && it.tags.includes('veg')) item.suitableForDiet = 'https://schema.org/VegetarianDiet';
+        return item;
+      }),
+    }));
+    const data = {
+      '@context': 'https://schema.org',
+      '@type': 'Menu',
+      '@id': location.origin + '/#menu',
+      name: t('carteTitle') || 'Menu',
+      inLanguage: lang,
+      hasMenuSection: secs,
+    };
+    let el = document.getElementById('ldMenu');
+    if (!el) { el = document.createElement('script'); el.type = 'application/ld+json'; el.id = 'ldMenu'; document.head.appendChild(el); }
+    el.textContent = JSON.stringify(data);
+  } catch (e) { /* le JSON-LD du commerce reste en place */ }
 }
 
 function applySeo() {
@@ -297,6 +325,7 @@ function applyI18n() {
   $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   $$('.lang-switch button').forEach(b => b.classList.toggle('is-active', b.dataset.setlang === lang));
   applySeo();
+  injectMenuSchema();
   buildTabs();
   buildFilters();
   renderMenu();
@@ -461,6 +490,31 @@ function bindCatering() {
     };
     const tpl = CATERING_TPL[lang] || CATERING_TPL.fr;
     track('catering_submit', { guests: v.guests });
+    window.open(waLink(tpl(v)), '_blank', 'noopener');
+  });
+}
+
+
+/* ── formulaire de contact -> WhatsApp ──────────────────── */
+const CONTACT_TPL = {
+  fr: (v) => 'Message — Le Four' + NL + NL + 'Nom : ' + v.name + NL + 'Téléphone : ' + v.phone + NL + NL + v.message,
+  en: (v) => 'Message — Le Four' + NL + NL + 'Name: ' + v.name + NL + 'Phone: ' + v.phone + NL + NL + v.message,
+  ar: (v) => 'رسالة — لو فور' + NL + NL + 'الاسم: ' + v.name + NL + 'الهاتف: ' + v.phone + NL + NL + v.message,
+};
+
+function bindContact() {
+  const form = $('#contactForm');
+  if (!form) return;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const v = {
+      name: (fd.get('name') || '').toString().trim(),
+      phone: (fd.get('phone') || '').toString().trim(),
+      message: (fd.get('message') || '').toString().trim(),
+    };
+    const tpl = CONTACT_TPL[lang] || CONTACT_TPL.fr;
+    track('contact_submit', { form: 'contact' });
     window.open(waLink(tpl(v)), '_blank', 'noopener');
   });
 }
@@ -679,6 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
   applyI18n();
   bindStory();
   bindCatering();
+  bindContact();
   bindOrderSheet();
   loadPhotos();
   setInterval(renderStatus, 60000);

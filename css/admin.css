@@ -63,6 +63,7 @@ transition:background .2s,color .2s,border-color .2s}
 .atab:hover{border-color:var(--olive)}
 .atab.is-on{background:var(--herbs);border-color:var(--herbs);color:var(--ivory)}
 .pane{display:block}
+.pane[hidden],[hidden]{display:none!important}
 
 /* ── form fields ── */
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}

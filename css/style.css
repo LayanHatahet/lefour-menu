@@ -774,3 +774,7 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
   .gal-item { width: 320px; }
   .picker { max-height: 320px; }
 }
+
+/* ── formulaire de contact ─────────────────────── */
+.contactform { margin: 26px 14px 0; border-top: 1px solid var(--hair); padding-top: 16px; }
+@media (min-width: 1020px) { .contactform { margin: 14px 36px 0; max-width: 1008px; } }
