@@ -69,7 +69,7 @@ module.exports = async (req, res) => {
     if (req.method === 'GET') {
       const b = await findBlob();
       if (!b) return res.status(200).json({ settings: DEFAULTS, configured: true });
-      const r = await fetch(b.url + `?t=${Date.now()}`);
+      const r = await fetch(b.url + `?t=${Date.now()}`, { cache: 'no-store' });
       const saved = r.ok ? await r.json().catch(() => ({})) : {};
       return res.status(200).json({ settings: merge(DEFAULTS, saved), configured: true });
     }
