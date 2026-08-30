@@ -298,6 +298,8 @@ function ensureArabicFonts() {
   const l = document.createElement('link');
   l.id = 'fontArabic';
   l.rel = 'stylesheet';
+  l.media = 'print';
+  l.onload = function () { this.media = 'all'; };
   l.href = 'https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap';
   document.head.appendChild(l);
 }
