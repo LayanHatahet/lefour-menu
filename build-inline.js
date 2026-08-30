@@ -8,6 +8,8 @@ const htmlPath = `${path}/index.html`;
 let html = fs.readFileSync(htmlPath, 'utf8');
 const css = fs.readFileSync(cssPath, 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '')      // strip comments
+  // once inlined, the CSS lives at "/" not "/css/" -> make asset paths absolute
+  .replace(/url\((['"]?)\.\.\/assets\//g, 'url($1/assets/')
   .replace(/\s*\n\s*/g, '\n')            // trim indentation
   .replace(/\n{2,}/g, '\n')
   .trim();
