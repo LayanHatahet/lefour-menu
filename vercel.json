@@ -4,6 +4,14 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/robots.txt",
+      "destination": "/api/seo?f=robots"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/seo?f=sitemap"
+    },
+    {
       "source": "/fr",
       "destination": "/"
     },

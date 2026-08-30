@@ -291,6 +291,17 @@ function injectMenuSchema() {
   } catch (e) { /* le JSON-LD du commerce reste en place */ }
 }
 
+
+/* polices arabes chargées à la demande (allège le chargement FR/EN) */
+function ensureArabicFonts() {
+  if (lang !== 'ar' || document.getElementById('fontArabic')) return;
+  const l = document.createElement('link');
+  l.id = 'fontArabic';
+  l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap';
+  document.head.appendChild(l);
+}
+
 function applySeo() {
   const st = window.LF_SETTINGS;
   if (!st) return;
@@ -316,6 +327,15 @@ function applySeo() {
   }
   const loc = { fr: 'fr_CA', en: 'en_CA', ar: 'ar_AR' }[lang] || 'fr_CA';
   set('meta[property="og:locale"]', 'content', loc);
+  /* garder canonical / og:url / JSON-LD alignés sur le domaine réellement utilisé */
+  const origin = location.origin.replace(/\/$/, '');
+  const canon = document.querySelector('link[rel="canonical"]');
+  if (canon) canon.href = origin + '/';
+  set('meta[property="og:url"]', 'content', origin + '/');
+  document.querySelectorAll('link[rel="alternate"][hreflang]').forEach(l => {
+    const hl = l.getAttribute('hreflang');
+    l.href = origin + (hl === 'x-default' ? '/' : '/?lang=' + hl.split('-')[0]);
+  });
 }
 
 function applyI18n() {
@@ -324,6 +344,7 @@ function applyI18n() {
   document.body.dataset.lang = lang;
   $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   $$('.lang-switch button').forEach(b => b.classList.toggle('is-active', b.dataset.setlang === lang));
+  ensureArabicFonts();
   applySeo();
   injectMenuSchema();
   buildTabs();

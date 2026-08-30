@@ -1,7 +1,0 @@
-# Le Four — Boulangerie
-User-agent: *
-Allow: /
-Disallow: /admin.html
-Disallow: /api/
-
-Sitemap: https://lefour.vercel.app/sitemap.xml
