@@ -443,9 +443,12 @@ function renderStatus() {
 
 /* ── traiteur → WhatsApp ────────────────────────────────── */
 const CATERING_TPL = {
-  fr: (v) => `Demande traiteur — Le Four\n\nNom : ${v.name}\nTéléphone : ${v.phone}\nDate de l'événement : ${v.date}\nNombre de personnes : ${v.guests}\n\nArticles :\n${v.items}\n\nNote :\n${v.details || DASH}`,
-  en: (v) => `Catering request — Le Four\n\nName: ${v.name}\nPhone: ${v.phone}\nEvent date: ${v.date}\nGuests: ${v.guests}\n\nItems:\n${v.items}\n\nNote:\n${v.details || DASH}`,
-  ar: (v) => `طلب كاترينغ — لو فور\n\nالاسم: ${v.name}\nالهاتف: ${v.phone}\nتاريخ المناسبة: ${v.date}\nعدد الأشخاص: ${v.guests}\n\nالأصناف:\n${v.items}\n\nملاحظة:\n${v.details || DASH}`,
+  fr: (v) => `Demande traiteur — Le Four\n\nOccasion : ${v.occasion || DASH}
+Nom : ${v.name}\nTéléphone : ${v.phone}\nDate de l'événement : ${v.date}\nNombre de personnes : ${v.guests}\n\nArticles :\n${v.items}\n\nNote :\n${v.details || DASH}`,
+  en: (v) => `Catering request — Le Four\n\nOccasion: ${v.occasion || DASH}
+Name: ${v.name}\nPhone: ${v.phone}\nEvent date: ${v.date}\nGuests: ${v.guests}\n\nItems:\n${v.items}\n\nNote:\n${v.details || DASH}`,
+  ar: (v) => `طلب كاترينغ — لو فور\n\nالمناسبة: ${v.occasion || DASH}
+الاسم: ${v.name}\nالهاتف: ${v.phone}\nتاريخ المناسبة: ${v.date}\nعدد الأشخاص: ${v.guests}\n\nالأصناف:\n${v.items}\n\nملاحظة:\n${v.details || DASH}`,
 };
 
 /* ── sélecteur d'articles pour le traiteur ──────────────── */
@@ -512,6 +515,7 @@ function bindCatering() {
     e.preventDefault();
     const fd = new FormData(form);
     const v = {
+      occasion: (fd.get('occasion') || '').toString().trim(),
       name: (fd.get('name') || '').toString().trim(),
       phone: (fd.get('phone') || '').toString().trim(),
       date: (fd.get('date') || '').toString(),
@@ -606,6 +610,23 @@ const CART_TPL = {
   ar: (lines, note, total) => 'مرحبا! بدي اطلب:' + NL + NL + lines +
       (total ? NL + NL + 'المجموع التقريبي: ' + total : '') + (note ? NL + NL + 'ملاحظة: ' + note : ''),
 };
+
+
+function bindSheetAdd() {
+  const b = $('#sheetAdd');
+  if (!b) return;
+  b.addEventListener('click', () => {
+    if (!SHEET_ITEM) return;
+    const price = SHEET_ITEM.price != null ? SHEET_ITEM.price : null;
+    const label = SHEET_KIND === 'mini' ? '12' : (SHEET_ITEM.price != null ? t('sizeR') : '');
+    cartAdd(SHEET_ITEM, SHEET_KIND, price, label);
+    const span = b.querySelector('span');
+    const prev = span.textContent;
+    span.textContent = t('added');
+    b.classList.add('is-done');
+    setTimeout(() => { span.textContent = prev; b.classList.remove('is-done'); }, 1100);
+  });
+}
 
 function bindCart() {
   const cart = $('#cart');
@@ -893,7 +914,9 @@ const sheet = $('#sheet');
 const sheetCard = $('#sheetCard');
 let lastFocus = null;
 
+let SHEET_ITEM = null, SHEET_KIND = null;
 function openSheet(item, kind) {
+  SHEET_ITEM = item; SHEET_KIND = kind;
   lastFocus = document.activeElement;
   track('view_item', { item_name: (item.name && item.name.en) || item.id, item_id: item.id, item_category: kind });
   const photo = PHOTOS.dishes[item.id];
