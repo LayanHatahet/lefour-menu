@@ -42,7 +42,7 @@ module.exports = async (req, res) => {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const { kind, id, dataUrl } = body;
     if (!dataUrl || typeof dataUrl !== 'string') return res.status(400).json({ error: 'dataUrl required' });
-    if (kind !== 'dish' && kind !== 'gallery') return res.status(400).json({ error: 'bad kind' });
+    if (kind !== 'dish' && kind !== 'gallery' && kind !== 'hero') return res.status(400).json({ error: 'bad kind' });
     if (kind === 'dish' && !/^[a-z0-9-]{1,40}$/i.test(id || '')) return res.status(400).json({ error: 'bad id' });
 
     const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(dataUrl);
@@ -53,11 +53,17 @@ module.exports = async (req, res) => {
 
     const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
     const stamp = Date.now().toString(36);
-    const pathname = kind === 'dish' ? `dish/${id}/${stamp}.${ext}` : `gallery/${stamp}.${ext}`;
+    const pathname = kind === 'dish' ? `dish/${id}/${stamp}.${ext}`
+      : kind === 'hero' ? `hero/${stamp}.${ext}`
+      : `gallery/${stamp}.${ext}`;
 
     /* remplace l'ancienne photo du plat */
     if (kind === 'dish') {
       const old = await listPrefix(`dish/${id}/`);
+      await del(old.map(b => b.url));
+    }
+    if (kind === 'hero') {
+      const old = await listPrefix('hero/');
       await del(old.map(b => b.url));
     }
 

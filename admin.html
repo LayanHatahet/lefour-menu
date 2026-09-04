@@ -106,6 +106,19 @@
     <div class="pane" id="pane-photos">
 
     <section class="block">
+      <h2>Home page photo</h2>
+      <p class="muted">The big shot under the logo on the front page &mdash; ideally manakish coming out of the oven. If empty, the Zaatar photo is used.</p>
+      <div class="row" id="heroRow">
+        <span class="thumb" id="heroThumb">none</span>
+        <span class="rname">Hero photo<small>hero</small></span>
+        <span class="ract">
+          <label id="heroLabel">Add<input type="file" accept="image/*" hidden id="heroInput"></label>
+          <button class="del" id="heroDel" hidden>Remove</button>
+        </span>
+      </div>
+    </section>
+
+    <section class="block">
       <h2>Restaurant gallery</h2>
       <p class="muted">Photos of the shop, shown in the “Chez nous” section of the menu.</p>
       <label class="drop" id="galDrop">

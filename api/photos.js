@@ -29,12 +29,12 @@ module.exports = async (req, res) => {
   res.setHeader('cache-control', 'no-store');
 
   if (!token()) {
-    return res.status(200).json({ dishes: {}, gallery: [], configured: false });
+    return res.status(200).json({ dishes: {}, gallery: [], hero: '', configured: false });
   }
 
   try {
     if (req.method === 'GET') {
-      const [dishBlobs, galBlobs] = await Promise.all([listAll('dish/'), listAll('gallery/')]);
+      const [dishBlobs, galBlobs, heroBlobs] = await Promise.all([listAll('dish/'), listAll('gallery/'), listAll('hero/')]);
       const dishes = {};
       for (const b of dishBlobs) {
         const id = String(b.pathname || '').split('/')[1];
@@ -43,7 +43,8 @@ module.exports = async (req, res) => {
       const gallery = galBlobs
         .sort((a, b) => String(a.pathname).localeCompare(String(b.pathname)))
         .map(b => b.url);
-      return res.status(200).json({ dishes, gallery, configured: true });
+      const hero = (heroBlobs[0] || {}).url || '';
+      return res.status(200).json({ dishes, gallery, hero, configured: true });
     }
 
     if (req.method === 'POST') {

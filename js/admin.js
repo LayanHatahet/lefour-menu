@@ -68,9 +68,21 @@ async function load() {
   } else {
     note.hidden = true;
   }
+  renderHero();
   renderGallery();
   renderDishes();
   await loadSettings();
+}
+
+
+/* ── home page hero photo ───────────────────────────────── */
+function renderHero() {
+  const url = DATA.hero || '';
+  const thumb = $('#heroThumb'), del = $('#heroDel'), label = $('#heroLabel');
+  if (!thumb) return;
+  thumb.innerHTML = url ? `<img src="${url}" alt="" loading="lazy">` : 'none';
+  del.hidden = !url;
+  label.firstChild.textContent = url ? 'Replace' : 'Add';
 }
 
 /* ── gallery ────────────────────────────────────────────── */
@@ -293,6 +305,13 @@ $('#logout').addEventListener('click', () => {
   sessionStorage.removeItem('lefour-admin');
   location.reload();
 });
+
+$('#heroInput').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) await uploadPhoto('hero', f);
+  e.target.value = '';
+});
+$('#heroDel').addEventListener('click', () => { if (DATA.hero) removePhoto(DATA.hero); });
 
 $('#galInput').addEventListener('change', async (e) => {
   const files = [...(e.target.files || [])];

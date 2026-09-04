@@ -219,7 +219,7 @@ function inkArt(item, kind) {
 }
 
 /* ─────────────────────────── i18n ──────────────────────── */
-let PHOTOS = { dishes: {}, gallery: [] };
+let PHOTOS = { dishes: {}, gallery: [], hero: '' };
 
 /* texte alternatif éditable depuis le tableau de bord (SEO images) */
 function altFor(key, fallback) {
@@ -233,9 +233,12 @@ async function loadPhotos() {
     const r = await fetch('/api/photos', { cache: 'no-store' });
     if (!r.ok) return;
     const j = await r.json();
-    PHOTOS = { dishes: j.dishes || {}, gallery: j.gallery || [] };
+    PHOTOS = { dishes: j.dishes || {}, gallery: j.gallery || [], hero: j.hero || '' };
     renderMenu();
     renderGallery();
+    renderHeroShot();
+    renderFeatured();
+    renderMenu();
   } catch (e) { /* pas de photos : on garde les illustrations */ }
 }
 
@@ -353,9 +356,14 @@ function applyI18n() {
   buildFilters();
   renderMenu();
   renderStatus();
+  renderHours();
   wirePickupMsgs();
   renderPicker();
+  renderOccasions();
   renderGallery();
+  renderHeroShot();
+  renderFeatured();
+  cartRender();
 }
 
 const track = (e, p) => { if (window.lfTrack) window.lfTrack(e, p || {}); };
@@ -518,6 +526,207 @@ function bindCatering() {
 }
 
 
+
+/* ══════════ PANIER ══════════════════════════════════════
+   Le client veut pouvoir ajouter un plat dès qu'il voit sa photo.
+   Rien n'est encaissé ici : la commande part sur WhatsApp. */
+let CART = [];
+try { CART = JSON.parse(localStorage.getItem('lefour-cart') || '[]'); } catch (e) { CART = []; }
+
+function cartSave() {
+  try { localStorage.setItem('lefour-cart', JSON.stringify(CART)); } catch (e) {}
+  cartRender();
+}
+function cartCount() { return CART.reduce((a, l) => a + l.qty, 0); }
+function cartTotal() { return CART.reduce((a, l) => a + (l.price || 0) * l.qty, 0); }
+
+function catOf(id) {
+  for (const c of CATS) if ((MENU[c.key] || []).some(i => i.id === id)) return c.key;
+  return 'manakish';
+}
+function itemOf(id) {
+  for (const c of CATS) { const f = (MENU[c.key] || []).find(i => i.id === id); if (f) return f; }
+  return null;
+}
+
+function cartAdd(item, kind, price, sizeLabel) {
+  const key = item.id + '|' + (sizeLabel || '');
+  const line = CART.find(l => l.key === key);
+  if (line) line.qty++;
+  else CART.push({ key, id: item.id, kind, qty: 1,
+                   price: price == null ? null : price, size: sizeLabel || '' });
+  track('add_to_cart', { item: item.id, size: sizeLabel || 'default' });
+  cartSave();
+}
+
+function cartRender() {
+  const n = cartCount();
+  const badge = $('#sbCount');
+  if (badge) { badge.textContent = String(n); badge.hidden = n === 0; }
+  const list = $('#cartList'), foot = $('#cartFoot'), empty = $('#cartEmpty');
+  if (!list) return;
+  empty.hidden = n > 0;
+  foot.hidden = n === 0;
+  list.innerHTML = CART.map(l => {
+    const it = itemOf(l.id);
+    const name = it ? it.name[lang] : l.id;
+    const photo = PHOTOS.dishes[l.id];
+    const art = photo
+      ? '<img src="' + photo + '" alt="" loading="lazy">'
+      : (it ? inkArt(it, l.kind) : '');
+    return '<div class="cline" data-key="' + l.key + '">' +
+      '<span class="cline-art">' + art + '</span>' +
+      '<span class="cline-mid"><b>' + name + '</b>' +
+      (l.size ? '<small>' + l.size + '</small>' : '') +
+      (l.price != null ? '<em>' + fmtPrice(l.price) + '</em>' : '') +
+      '</span>' +
+      '<span class="cline-qty">' +
+      '<button type="button" data-dec="' + l.key + '" aria-label="moins">&minus;</button>' +
+      '<i>' + l.qty + '</i>' +
+      '<button type="button" data-inc="' + l.key + '" aria-label="plus">+</button>' +
+      '</span></div>';
+  }).join('');
+  const tot = cartTotal();
+  const tEl = $('#cartTotal');
+  if (tEl) tEl.textContent = tot > 0 ? fmtPrice(tot) : '—';
+  $$('#cartList [data-inc]').forEach(b => b.addEventListener('click', () => {
+    const l = CART.find(x => x.key === b.dataset.inc); if (l) { l.qty++; cartSave(); }
+  }));
+  $$('#cartList [data-dec]').forEach(b => b.addEventListener('click', () => {
+    const i = CART.findIndex(x => x.key === b.dataset.dec);
+    if (i > -1) { CART[i].qty--; if (CART[i].qty <= 0) CART.splice(i, 1); cartSave(); }
+  }));
+}
+
+const CART_TPL = {
+  fr: (lines, note, total) => 'Bonjour ! Je voudrais commander :' + NL + NL + lines +
+      (total ? NL + NL + 'Total estimé : ' + total : '') + (note ? NL + NL + 'Note : ' + note : ''),
+  en: (lines, note, total) => 'Hi! I would like to order:' + NL + NL + lines +
+      (total ? NL + NL + 'Estimated total: ' + total : '') + (note ? NL + NL + 'Note: ' + note : ''),
+  ar: (lines, note, total) => 'مرحبا! بدي اطلب:' + NL + NL + lines +
+      (total ? NL + NL + 'المجموع التقريبي: ' + total : '') + (note ? NL + NL + 'ملاحظة: ' + note : ''),
+};
+
+function bindCart() {
+  const cart = $('#cart');
+  if (!cart) return;
+  const open = () => {
+    cartRender();
+    cart.classList.add('is-open');
+    cart.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    track('cart_open', { items: cartCount() });
+  };
+  const close = () => {
+    cart.classList.remove('is-open');
+    cart.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  };
+  window.openCart = open;
+  $$('#cart [data-cclose]').forEach(el => el.addEventListener('click', close));
+  $('#cartClear').addEventListener('click', () => { CART = []; cartSave(); });
+  $('#cartSend').addEventListener('click', () => {
+    const lines = CART.map(l => {
+      const it = itemOf(l.id);
+      const nm = it ? it.name[lang] : l.id;
+      return '• ' + nm + (l.size ? ' (' + l.size + ')' : '') + ' × ' + l.qty;
+    }).join(NL);
+    const note = ($('#cartNote').value || '').trim();
+    const tot = cartTotal();
+    const tpl = CART_TPL[lang] || CART_TPL.fr;
+    track('cart_submit', { items: cartCount(), value: tot });
+    window.open(waLink(tpl(lines, note, tot > 0 ? fmtPrice(tot) : '')), '_blank', 'noopener');
+  });
+  $('#sbOrder').addEventListener('click', () => {
+    if (cartCount() > 0) open();
+    else { const b = $('#orderOpen'); if (b) b.click(); }
+  });
+  cartRender();
+}
+
+/* ══════════ photo héro + bandeau « incontournables » ══════ */
+function renderHeroShot() {
+  const fig = $('#heroShot'), img = $('#heroShotImg');
+  if (!fig || !img) return;
+  const preferred = ['zaatar', 'zaatar-cheese', 'cheese', 'lahm'];
+  const pick = PHOTOS.hero
+    || preferred.map(id => PHOTOS.dishes[id]).find(Boolean)
+    || Object.values(PHOTOS.dishes)[0];
+  if (!pick) { fig.hidden = true; return; }
+  fig.hidden = false;
+  img.src = pick;
+  img.alt = altFor('hero', 'Manakish fraîchement sorties du four — Boulangerie Le Four, Pierrefonds');
+}
+
+function renderFeatured() {
+  const sec = $('#featured'), strip = $('#featStrip');
+  if (!sec || !strip) return;
+  const withPhoto = [];
+  for (const c of CATS) {
+    for (const it of (MENU[c.key] || [])) {
+      const u = PHOTOS.dishes[it.id];
+      if (u) withPhoto.push({ it: it, u: u, kind: c.kind, cat: c.key });
+    }
+  }
+  if (withPhoto.length < 2) { sec.hidden = true; return; }
+  sec.hidden = false;
+  strip.innerHTML = withPhoto.slice(0, 10).map(x =>
+    '<button type="button" class="feat" data-id="' + x.it.id + '" data-cat="' + x.cat + '" data-kind="' + x.kind + '">' +
+    '<img src="' + x.u + '" alt="' + altFor('dish:' + x.it.id, x.it.name[lang]) + '" loading="lazy" decoding="async">' +
+    '<span class="feat-cap"><b>' + x.it.name[lang] + '</b>' +
+    (x.it.price != null ? '<i>' + fmtPrice(x.it.price) + '</i>' : '') +
+    '</span></button>').join('');
+  $$('#featStrip .feat').forEach(b => b.addEventListener('click', () => {
+    const it = (MENU[b.dataset.cat] || []).find(i => i.id === b.dataset.id);
+    if (it) openSheet(it, b.dataset.kind);
+  }));
+}
+
+/* ══════════ horaire complet de la semaine ══════════════ */
+const DAY_NAMES = {
+  fr: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  ar: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+};
+function hhmm(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (lang === 'en') {
+    const ap = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 || 12;
+    return h12 + ':' + String(m).padStart(2, '0') + ' ' + ap;
+  }
+  return (h + ' h ' + (m ? String(m).padStart(2, '0') : '')).trim();
+}
+function renderHours() {
+  const el = $('#hoursList');
+  if (!el) return;
+  const today = montrealNow().day;
+  const names = DAY_NAMES[lang] || DAY_NAMES.fr;
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  el.innerHTML = order.map(d => {
+    const w = SCHEDULE[d];
+    return '<div class="h-row' + (d === today ? ' is-today' : '') + (w ? '' : ' h-closed') + '">' +
+      '<span>' + names[d] + (d === today ? ' <i>' + t('hoursToday') + '</i>' : '') + '</span>' +
+      '<b>' + (w ? '\u200E' + hhmm(w[0]) + ' – ' + hhmm(w[1]) + '\u200E' : t('closed')) + '</b>' +
+      '</div>';
+  }).join('');
+}
+
+/* ══════════ type d'occasion (traiteur) ═════════════════ */
+const OCCASIONS = ['occCorpBreakfast', 'occOfficeLunch', 'occMeeting', 'occFamily', 'occCorporate', 'occOther'];
+function renderOccasions() {
+  const host = $('#occPick');
+  if (!host) return;
+  const field = $('#occValue');
+  const cur = field ? field.value : '';
+  host.innerHTML = OCCASIONS.map(k =>
+    '<button type="button" class="occ-chip' + (t(k) === cur ? ' is-on' : '') + '" data-occ="' + k + '">' + t(k) + '</button>').join('');
+  $$('#occPick .occ-chip').forEach(b => b.addEventListener('click', () => {
+    $$('#occPick .occ-chip').forEach(x => x.classList.toggle('is-on', x === b));
+    if (field) field.value = t(b.dataset.occ);
+  }));
+}
+
 /* ── formulaire de contact -> WhatsApp ──────────────────── */
 const CONTACT_TPL = {
   fr: (v) => 'Message — Le Four' + NL + NL + 'Nom : ' + v.name + NL + 'Téléphone : ' + v.phone + NL + NL + v.message,
@@ -581,7 +790,10 @@ function buildTabs() {
   $('#tabs').innerHTML = CATS.map((c, i) => `
     <button class="tab ${i === 0 ? 'is-active' : ''}" data-tab="${c.key}">
       ${t(titleKey[c.key])} <small>${MENU[c.key].length}</small>
-    </button>`).join('');
+    </button>`).join('')
+    /* le traiteur est une section à part entière, demandée au même niveau
+       que Manakish / Mezzé / Boissons */
+    + `<button class="tab tab--catering" data-tab="catering">${t('cateringTitle')}</button>`;
   $$('.tab').forEach(tab => tab.addEventListener('click', () => {
     const target = $('#' + tab.dataset.tab);
     if (target) target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
@@ -758,6 +970,10 @@ document.addEventListener('DOMContentLoaded', () => {
   bindCatering();
   bindContact();
   bindOrderSheet();
+  bindCart();
+  bindSheetAdd();
+  const sbc = $('#sbCall');
+  if (sbc) sbc.href = 'tel:+' + INFO.phoneRaw;
   loadPhotos();
   setInterval(renderStatus, 60000);
   $$('[data-setlang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.setlang)));
