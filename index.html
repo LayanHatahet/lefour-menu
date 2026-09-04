@@ -56,6 +56,7 @@
     "image": "https://lefour.vercel.app/assets/og-cover.jpg",
     "logo": "https://lefour.vercel.app/assets/logo_full.png",
     "priceRange": "$",
+    "keywords": "Manakish Montreal, Manakish West Island, Halal bakery Montreal, Lebanese bakery Pierrefonds, Syrian bakery Montreal, Halal catering Montreal, Corporate catering West Island",
     "servesCuisine": ["Lebanese", "Syrian", "Middle Eastern", "Bakery"],
     "currenciesAccepted": "CAD",
     "address": {
@@ -107,13 +108,14 @@
         <h1 class="visually-hidden">Boulangerie Le Four — manakish et fatayer halal à Pierrefonds, West Island (Montréal)</h1>
         <img src="assets/logo_full_ivory.png" alt="Boulangerie Le Four — Pierrefonds" class="cover-logo" width="660" height="381" fetchpriority="high" decoding="async">
 
-        <!-- les manakish qui sortent du four, juste sous le rouleau du logo -->
+        <!-- la promesse, juste sous le rouleau du logo -->
+        <p class="hero-line1" data-i18n="heroTag1">Manakish authentiques. Cuites fraîches.</p>
+        <p class="halal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="heroTag2">100 % halal</span></p>
+
+        <!-- les manakish qui sortent du four -->
         <figure class="hero-shot" id="heroShot">
           <img id="heroShotImg" alt="Manakish fraîchement sorties du four chez Le Four" loading="eager" decoding="async">
         </figure>
-
-        <p class="hero-line1" data-i18n="heroTag1">Manakish authentiques. Cuites fraîches.</p>
-        <p class="halal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="heroTag2">100 % halal</span></p>
 
         <div class="cover-btns">
           <button type="button" class="cta cta--primary" id="orderOpen">
@@ -172,7 +174,7 @@
     </section>
 
     <!-- ═══════ catering / traiteur ═══════ -->
-    <section class="catering" id="catering">
+    <section class="catering" id="catering" data-key="catering">
       <h2 class="sec-title" data-i18n="cateringHead">Un traiteur pour chaque occasion</h2>
       <p class="cat-line" data-i18n="cateringLine">Déjeuners d’entreprise • Dîners au bureau • Réunions • Fêtes de famille</p>
       <p class="cat-size" data-i18n="cateringSize">Dites-nous combien vous êtes. On s’occupe du reste.</p>
@@ -280,8 +282,7 @@
     <section class="story">
       <button class="story-toggle" id="storyToggle" aria-expanded="false">
         <span class="story-label">
-          <span class="kicker" data-i18n="storyKicker">De Damas à Beyrouth</span>
-          <b data-i18n="storyTitle">Plus qu’une boulangerie</b>
+          <b data-i18n="storyTitle">Notre histoire</b>
         </span>
         <i class="story-chev" aria-hidden="true"></i>
       </button>
@@ -297,7 +298,8 @@
 
     <footer class="foot">
       <img src="assets/logo_rollpin.png" alt="" class="foot-pin" width="420" height="55" loading="lazy" decoding="async">
-      <p class="foot-line" data-i18n="footerLine">Boulangerie libano-syrienne — manakish, fatayer &amp; pizzas au feu de bois.</p>
+      <p class="foot-line" data-i18n="footerLine">Boulangerie libano-syrienne — manakish, fatayer &amp; bouchées. Tout est 100 % halal.</p>
+      <p class="foot-seo" data-i18n="seoLine">Manakish à Montréal et dans le West Island · boulangerie halal libanaise et syrienne à Pierrefonds · traiteur halal et corporatif pour Montréal et le West Island.</p>
       <div class="foot-langs">
         <button data-setlang="fr">Français</button><span>·</span>
         <button data-setlang="en">English</button><span>·</span>
