@@ -60,7 +60,7 @@ async function api(path, opts = {}) {
 }
 
 async function load() {
-  DATA = await api('/api/photos');
+  DATA = await api('/api/photos?t=' + Date.now());
   const note = $('#notice');
   if (DATA.configured === false) {
     note.hidden = false;

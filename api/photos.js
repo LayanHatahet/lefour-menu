@@ -26,7 +26,12 @@ async function listAll(prefix) {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('cache-control', 'no-store');
+  /* GET est mis en cache par le CDN : la page ne paie jamais un cold start.
+     60 s de fraicheur + revalidation en arriere-plan -> une photo ajoutee
+     depuis le tableau de bord apparait en moins d'une minute. */
+  res.setHeader('cache-control', req.method === 'GET'
+    ? 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+    : 'no-store');
 
   if (!token()) {
     return res.status(200).json({ dishes: {}, gallery: [], hero: '', configured: false });

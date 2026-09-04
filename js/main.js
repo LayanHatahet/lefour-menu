@@ -228,18 +228,20 @@ function altFor(key, fallback) {
   return (v && String(v).trim()) || fallback || '';
 }
 
-async function loadPhotos() {
+async function loadPhotos(attempt = 0) {
   try {
-    const r = await fetch('/api/photos', { cache: 'no-store' });
-    if (!r.ok) return;
+    const r = await fetch('/api/photos');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     PHOTOS = { dishes: j.dishes || {}, gallery: j.gallery || [], hero: j.hero || '' };
     renderMenu();
     renderGallery();
     renderHeroShot();
     renderFeatured();
-    renderMenu();
-  } catch (e) { /* pas de photos : on garde les illustrations */ }
+  } catch (e) {
+    /* premiere reponse lente ou reseau capricieux : on retente une fois */
+    if (attempt < 2) setTimeout(() => loadPhotos(attempt + 1), 1200 * (attempt + 1));
+  }
 }
 
 function renderGallery() {
