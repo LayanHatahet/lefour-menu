@@ -566,6 +566,7 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 }
 .foot-pin { height: 14px; width: auto; opacity: .75; }
 .foot-line { font-size: .76rem; opacity: .6; max-width: 330px; }
+.foot-seo { font-size: .68rem; opacity: .45; max-width: 360px; line-height: 1.5; }
 .foot-langs { display: flex; gap: 10px; font-size: .8rem; opacity: .7; }
 .foot-langs button:hover { color: var(--olive); }
 .foot-copy { font-size: .64rem; opacity: .4; margin-top: 6px; }
@@ -805,7 +806,7 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 
 /* ══════════ HERO v2 : la photo sous le rouleau ══════════ */
 .hero-shot {
-  width: min(300px, 72vw); margin: 2px auto 0;
+  width: min(300px, 72vw); margin: 8px auto 0;
   border-radius: 20px; overflow: hidden;
   border: 1px solid rgba(244, 236, 223, .3);
   box-shadow: 0 18px 44px -20px rgba(0, 0, 0, .75);
@@ -906,7 +907,12 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 .foot { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 
 /* ══════════ panier ══════════ */
-.cart-card { max-height: 88svh; }
+#cart { position: fixed; inset: 0; z-index: 905; visibility: hidden; }
+#cart.is-open { visibility: visible; }
+#cart .sheet-veil { opacity: 0; transition: opacity .35s; }
+#cart.is-open .sheet-veil { opacity: 1; }
+.cart-card { max-height: 88svh; transform: translateY(105%); }
+#cart.is-open .cart-card { transform: translateY(0); }
 .cart-empty { opacity: .6; font-size: .9rem; padding: 10px 0 4px; }
 .cart-list { width: 100%; display: grid; gap: 8px; }
 .cline {
@@ -943,6 +949,8 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 [dir="rtl"] .cart-total { letter-spacing: .02em; font-size: .84rem; }
 .cart-total b { font-family: var(--serif); font-size: 1.4rem; color: var(--herbs); letter-spacing: 0; }
 .cart-hint { font-size: .74rem; opacity: .55; text-align: center; }
+#cartSend { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 0; }
+#cartSend svg { width: 18px; height: 18px; flex: none; }
 .link-btn {
   font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
   opacity: .55; padding: 10px; width: 100%;

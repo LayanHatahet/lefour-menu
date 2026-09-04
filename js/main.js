@@ -909,6 +909,9 @@ function trackTabs() {
     });
   }, { rootMargin: '-15% 0px -70% 0px' });
   $$('.cat').forEach(c => tabObs.observe(c));
+  /* le traiteur a son propre onglet : il doit s'allumer lui aussi */
+  const cat = $('#catering');
+  if (cat) tabObs.observe(cat);
 }
 
 /* ───────────────────── bottom sheet ────────────────────── */
