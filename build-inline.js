@@ -66,6 +66,39 @@ const META = {
   },
 };
 
+/* the runtime UI dictionary, so the per-language documents ship translated copy
+   in the very first byte instead of French text swapped out by JS on load */
+const UI = (() => {
+  try {
+    const src = fs.readFileSync(`${out}/js/data.js`, 'utf8');
+    return new Function(src + ';\nreturn UI;')();
+  } catch (e) {
+    console.error('UI dictionary unavailable - copy left in French:', e.message);
+    return null;
+  }
+})();
+
+const escHtml = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+const I18N_RE = /(<([a-zA-Z0-9]+)\b[^>]*\bdata-i18n="([A-Za-z0-9_]+)"[^>]*>)([^<]*)(<\/\2>)/g;
+
+/* <span data-i18n="key">texte francais</span> -> the same node in `lng`.
+   Mirrors applyI18n(), which sets el.textContent = t(key) at runtime, so the
+   two can never disagree; every data-i18n element holds plain text only. */
+function translate(doc, lng) {
+  const dict = UI && UI[lng];
+  if (!dict) return doc;
+  let hit = 0, miss = 0;
+  const outDoc = doc.replace(I18N_RE, (m, open, tag, key, _inner, close) => {
+    const v = dict[key];
+    if (v == null) { miss++; return m; }
+    hit++;
+    return open + escHtml(v) + close;
+  });
+  console.log(`  ${lng}: translated ${hit} nodes` + (miss ? `, ${miss} key(s) missing` : ''));
+  return outDoc;
+}
+
 /* replace the first attribute match inside a given tag */
 function setAttr(doc, tagRe, attr, value) {
   return doc.replace(tagRe, (tag) => {
@@ -92,6 +125,9 @@ for (const [lng, m] of Object.entries(META)) {
 
   /* tell the runtime which language this document was built for */
   doc = doc.replace('<body data-lang="fr">', `<body data-lang="${lng}" data-lang-locked="1">`);
+
+  /* and the visible copy, so /en and /ar are not French pages repainted by JS */
+  doc = translate(doc, lng);
 
   /* the document now lives one level deep -> make every asset path absolute */
   doc = doc.replace(/(src|href)="(assets\/|js\/|css\/)/g, '$1="/$2');

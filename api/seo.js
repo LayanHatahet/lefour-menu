@@ -12,16 +12,21 @@ module.exports = (req, res) => {
   res.setHeader('cache-control', 'public, max-age=3600');
 
   if (which === 'sitemap') {
-    const pages = ['/', '/menu', '/traiteur', '/contact'];
-    const urls = pages.map(p => {
-      const alt = p === '/'
-        ? ['fr-CA', 'en-CA', 'ar'].map(h =>
-            `\n    <xhtml:link rel="alternate" hreflang="${h}" href="${base}/?lang=${h.split('-')[0]}"/>`).join('')
-          + `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${base}/"/>`
-        : '';
-      return `  <url>\n    <loc>${base}${p}</loc>\n    <changefreq>weekly</changefreq>` +
-             `\n    <priority>${p === '/' ? '1.0' : '0.8'}</priority>${alt}\n  </url>`;
-    }).join('\n');
+    /* Une langue = un document servi (/, /en, /ar), avec ses propres lang, dir,
+       title et canonical. Chaque version doit annoncer toutes les autres :
+       sans reciprocite, Google ignore le groupe hreflang au complet. */
+    const LANGS = [['fr-CA', '/'], ['en-CA', '/en'], ['ar', '/ar']];
+    const alternates =
+      LANGS.map(([h, p]) => `\n    <xhtml:link rel="alternate" hreflang="${h}" href="${base}${p}"/>`).join('')
+      + `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${base}/"/>`;
+
+    const pages = ['/', '/en', '/ar', '/menu', '/traiteur', '/contact'];
+    const isLang = (p) => LANGS.some(([, lp]) => lp === p);
+    const urls = pages.map(p =>
+      `  <url>\n    <loc>${base}${p}</loc>\n    <changefreq>weekly</changefreq>` +
+      `\n    <priority>${p === '/' ? '1.0' : '0.8'}</priority>` +
+      `${isLang(p) ? alternates : ''}\n  </url>`).join('\n');
+
     res.setHeader('content-type', 'application/xml; charset=utf-8');
     return res.status(200).send(
       `<?xml version="1.0" encoding="UTF-8"?>\n` +

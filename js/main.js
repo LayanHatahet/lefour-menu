@@ -271,10 +271,23 @@ const docLang = (document.body && document.body.dataset.lang) || '';
 const pathLang = (location.pathname.match(/^\/(fr|en|ar)(\/|$)/) || [])[1] || '';
 const urlLang = new URLSearchParams(location.search).get('lang');
 const LANG_LOCKED = !!(document.body && document.body.dataset.langLocked);
+const storedLang = (() => { try { return localStorage.getItem('lefour-lang') || ''; } catch (e) { return ''; } })();
 let lang = (LANG_LOCKED && UI[docLang]) ? docLang
   : (pathLang && UI[pathLang]) ? pathLang
   : (urlLang && UI[urlLang]) ? urlLang
-  : (localStorage.getItem('lefour-lang') || 'fr');
+  : (storedLang && UI[storedLang]) ? storedLang
+  : 'fr';
+
+/* l URL de chaque langue : le francais est a la racine, /en et /ar sont de
+   vrais documents servis avec leur propre lang, dir, title et canonical */
+function langPath(l) { return l === 'fr' ? '/' : '/' + l; }
+
+/* Un visiteur qui revient avec « anglais » en memoire arrivait sur le document
+   francais et le contenu etait reecrit en anglais par JS : le HTML servi et le
+   contenu se contredisaient (remarque SEO n.1). On l envoie sur son document. */
+if (!LANG_LOCKED && !pathLang && !urlLang && storedLang && UI[storedLang] && storedLang !== 'fr') {
+  location.replace(langPath(storedLang));
+}
 
 const FILTER_ALL = { fr: 'Tout', en: 'All', ar: 'الكل' };
 const SIZES_HINT = { fr: ['option', 'options'], en: ['option', 'options'], ar: ['خيار', 'خيارات'] };
@@ -354,14 +367,17 @@ function applySeo() {
   }
   const loc = { fr: 'fr_CA', en: 'en_CA', ar: 'ar_AR' }[lang] || 'fr_CA';
   set('meta[property="og:locale"]', 'content', loc);
-  /* garder canonical / og:url / JSON-LD alignés sur le domaine réellement utilisé */
+  /* Aligner canonical / og:url / hreflang sur le domaine reellement servi,
+     SANS changer de page : chaque langue a son propre document (/, /en, /ar).
+     Pointer le canonical de /en vers / ferait passer la version anglaise pour
+     un doublon de la francaise (remarque SEO n.1). */
   const origin = location.origin.replace(/\/$/, '');
   const canon = document.querySelector('link[rel="canonical"]');
-  if (canon) canon.href = origin + '/';
-  set('meta[property="og:url"]', 'content', origin + '/');
+  if (canon) canon.href = origin + langPath(lang);
+  set('meta[property="og:url"]', 'content', origin + langPath(lang));
   document.querySelectorAll('link[rel="alternate"][hreflang]').forEach(l => {
     const hl = l.getAttribute('hreflang');
-    l.href = origin + (hl === 'x-default' ? '/' : '/?lang=' + hl.split('-')[0]);
+    l.href = origin + (hl === 'x-default' ? '/' : langPath(hl.split('-')[0]));
   });
 }
 
@@ -711,9 +727,11 @@ function renderHeroShot() {
     || Object.values(PHOTOS.dishes)[0];
   if (!pick) { if (PHOTOS_READY) fig.hidden = true; return; }
   fig.hidden = false;
-  img.src = imgURL(pick, 828);
-  img.srcset = imgSet(pick, [414, 640, 828, 1200]);
-  img.sizes = '(min-width: 1020px) 420px, 92vw';
+  img.src = imgURL(pick, 640);
+  /* .hero-shot fait au plus min(300px, 72vw) : annoncer 420px/92vw faisait
+     telecharger un 828px la ou 640px suffit (remarque n.4, images mobiles) */
+  img.srcset = imgSet(pick, [414, 640, 828]);
+  img.sizes = '(min-width: 417px) 300px, 72vw';
   img.width = 820; img.height = 512;
   img.alt = altFor('hero', 'Manakish fraîchement sorties du four — Boulangerie Le Four, Pierrefonds');
 }
