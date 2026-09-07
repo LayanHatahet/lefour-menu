@@ -220,6 +220,10 @@ function inkArt(item, kind) {
 
 /* ─────────────────────────── i18n ──────────────────────── */
 let PHOTOS = { dishes: {}, gallery: [], hero: '' };
+/* Tant que /api/photos n'a pas répondu, on NE touche pas aux blocs qui
+   réservent déjà leur hauteur : les masquer puis les réafficher provoquait
+   deux sauts de mise en page (CLS 0,33). */
+let PHOTOS_READY = false;
 
 /* texte alternatif éditable depuis le tableau de bord (SEO images) */
 function altFor(key, fallback) {
@@ -233,12 +237,14 @@ async function loadPhotos(attempt = 0) {
     const r = await fetch('/api/photos');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
+    PHOTOS_READY = true;
     PHOTOS = { dishes: j.dishes || {}, gallery: j.gallery || [], hero: j.hero || '' };
     renderMenu();
     renderGallery();
     renderHeroShot();
     renderFeatured();
   } catch (e) {
+    if (attempt >= 1) PHOTOS_READY = true;
     /* premiere reponse lente ou reseau capricieux : on retente une fois */
     if (attempt < 2) setTimeout(() => loadPhotos(attempt + 1), 1200 * (attempt + 1));
   }
@@ -700,7 +706,7 @@ function renderHeroShot() {
   const pick = PHOTOS.hero
     || preferred.map(id => PHOTOS.dishes[id]).find(Boolean)
     || Object.values(PHOTOS.dishes)[0];
-  if (!pick) { fig.hidden = true; return; }
+  if (!pick) { if (PHOTOS_READY) fig.hidden = true; return; }
   fig.hidden = false;
   img.src = imgURL(pick, 828);
   img.srcset = imgSet(pick, [414, 640, 828, 1200]);
@@ -719,7 +725,7 @@ function renderFeatured() {
       if (u) withPhoto.push({ it: it, u: u, kind: c.kind, cat: c.key });
     }
   }
-  if (withPhoto.length < 2) { sec.hidden = true; return; }
+  if (withPhoto.length < 2) { if (PHOTOS_READY) sec.hidden = true; return; }
   sec.hidden = false;
   sec.classList.add('is-ready');
   strip.innerHTML = withPhoto.slice(0, 10).map(x =>
