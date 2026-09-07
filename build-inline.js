@@ -25,19 +25,6 @@ if (html.includes(link)) {
   console.error('style.css link not found — inline skipped');
 }
 
-/* ── 1b. inline the two menu scripts ──────────────────────
-   They build the menu list. As external files they downloaded after the first
-   paint, so the menu appeared late and pushed every section below it down
-   (CLS ~0.30 on desktop). Inlined, they run while the document is parsed and
-   the menu is already there when the page is first painted.               */
-const guard = (js) => js.replace(/<\/script/gi, '<\/script');
-for (const f of ['js/data.js', 'js/main.js']) {
-  const tag = `<script src="${f}"></script>`;
-  if (!html.includes(tag)) { console.error(`${f} tag not found — left external`); continue; }
-  const code = fs.readFileSync(`${out}/${f}`, 'utf8');
-  html = html.replace(tag, `<script>${guard(code)}</script>`);
-  console.log(`inlined ${(code.length / 1024).toFixed(1)}KB from ${f}`);
-}
 fs.writeFileSync(htmlPath, html);
 
 /* ── 2. per-language documents ────────────────────────────── */
