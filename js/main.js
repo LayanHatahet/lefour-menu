@@ -721,6 +721,7 @@ function renderFeatured() {
   }
   if (withPhoto.length < 2) { sec.hidden = true; return; }
   sec.hidden = false;
+  sec.classList.add('is-ready');
   strip.innerHTML = withPhoto.slice(0, 10).map(x =>
     '<button type="button" class="feat" data-id="' + x.it.id + '" data-cat="' + x.cat + '" data-kind="' + x.kind + '">' +
     '<img src="' + imgURL(x.u, 400) + '" srcset="' + imgSet(x.u, [256, 400, 640]) + '" sizes="200px" width="400" height="300" alt="' + altFor('dish:' + x.it.id, x.it.name[lang]) + '" loading="lazy" decoding="async">' +
