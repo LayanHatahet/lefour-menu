@@ -244,9 +244,12 @@ async function loadPhotos(attempt = 0) {
     renderHeroShot();
     renderFeatured();
   } catch (e) {
-    if (attempt >= 1) PHOTOS_READY = true;
-    /* premiere reponse lente ou reseau capricieux : on retente une fois */
-    if (attempt < 2) setTimeout(() => loadPhotos(attempt + 1), 1200 * (attempt + 1));
+    /* premiere reponse lente ou reseau capricieux : on retente */
+    if (attempt < 2) { setTimeout(() => loadPhotos(attempt + 1), 1200 * (attempt + 1)); return; }
+    /* plus d'espoir : on libere la place reservee */
+    PHOTOS_READY = true;
+    renderHeroShot();
+    renderFeatured();
   }
 }
 
