@@ -19,12 +19,27 @@ const css = fs.readFileSync(`${out}/css/style.css`, 'utf8')
 
 const link = '<link rel="stylesheet" href="css/style.css">';
 if (html.includes(link)) {
-  html = html.replace(link, `<style>${css}</style>`);
+  html = html.replace(link, () => `<style>${css}</style>`);
   console.log(`inlined ${(css.length / 1024).toFixed(1)}KB of CSS`);
 } else {
   console.error('style.css link not found — inline skipped');
 }
 
+/* ── 1b. inline the two menu scripts ──────────────────────
+   As external files they downloaded after the first paint, so the 35-card
+   menu appeared late and pushed every section below it down (desktop CLS
+   ~0.30). Inlined, they run while the document is parsed and the menu is
+   already laid out when the page is first painted.                        */
+for (const f of ['js/data.js', 'js/main.js']) {
+  const tag = `<script src="${f}"></script>`;
+  if (!html.includes(tag)) { console.error(`${f} tag not found — left external`); continue; }
+  const code = fs.readFileSync(`${out}/${f}`, 'utf8');
+  if (/<\/script/i.test(code)) { console.error(`${f} contains </script — left external`); continue; }
+  html = html.replace(tag, () => `<script>
+${code}
+</script>`);
+  console.log(`inlined ${(code.length / 1024).toFixed(1)}KB from ${f}`);
+}
 fs.writeFileSync(htmlPath, html);
 
 /* ── 2. per-language documents ────────────────────────────── */
