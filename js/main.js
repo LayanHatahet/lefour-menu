@@ -250,11 +250,22 @@ function renderGallery() {
   if (!PHOTOS.gallery.length) { sec.hidden = true; return; }
   sec.hidden = false;
   strip.innerHTML = PHOTOS.gallery.map((u, i) =>
-    `<figure class="gal-item"><img src="${u}" alt="${altFor('gallery:' + u, 'Boulangerie Le Four — Pierrefonds')}" loading="lazy" decoding="async"></figure>`).join('');
+    `<figure class="gal-item"><img src="${imgURL(u, 400)}" srcset="${imgSet(u, [256, 400, 640])}" sizes="220px" width="400" height="300" alt="${altFor('gallery:' + u, 'Boulangerie Le Four \u2014 Pierrefonds')}" loading="lazy" decoding="async"></figure>`).join('');
 }
 
+/* Priorité de la langue :
+   1. la langue du document servi (/en/, /ar/ sont de vrais documents HTML)
+   2. ?lang=
+   3. le dernier choix de l'utilisateur
+   Le document servi gagne pour que le HTML et le contenu ne se contredisent jamais. */
+const docLang = (document.body && document.body.dataset.lang) || '';
+const pathLang = (location.pathname.match(/^\/(fr|en|ar)(\/|$)/) || [])[1] || '';
 const urlLang = new URLSearchParams(location.search).get('lang');
-let lang = (urlLang && UI[urlLang]) ? urlLang : (localStorage.getItem('lefour-lang') || 'fr');
+const LANG_LOCKED = !!(document.body && document.body.dataset.langLocked);
+let lang = (LANG_LOCKED && UI[docLang]) ? docLang
+  : (pathLang && UI[pathLang]) ? pathLang
+  : (urlLang && UI[urlLang]) ? urlLang
+  : (localStorage.getItem('lefour-lang') || 'fr');
 
 const FILTER_ALL = { fr: 'Tout', en: 'All', ar: 'الكل' };
 const SIZES_HINT = { fr: ['option', 'options'], en: ['option', 'options'], ar: ['خيار', 'خيارات'] };
@@ -533,6 +544,20 @@ function bindCatering() {
 
 
 
+
+/* ── images responsives ──────────────────────────────────────
+   Les photos vivent sur Vercel Blob en pleine résolution. On les sert
+   redimensionnées et en AVIF/WebP via le pipeline d'images de Vercel :
+   une vignette de 58 px ne télécharge plus une image de 1400 px. */
+function imgURL(url, w) {
+  if (!url || url.startsWith('data:') || url.startsWith('/assets/')) return url;
+  return '/_vercel/image?url=' + encodeURIComponent(url) + '&w=' + w + '&q=72';
+}
+function imgSet(url, widths) {
+  if (!url || url.startsWith('data:')) return '';
+  return widths.map(w => imgURL(url, w) + ' ' + w + 'w').join(', ');
+}
+
 /* ══════════ PANIER ══════════════════════════════════════
    Le client veut pouvoir ajouter un plat dès qu'il voit sa photo.
    Rien n'est encaissé ici : la commande part sur WhatsApp. */
@@ -578,7 +603,7 @@ function cartRender() {
     const name = it ? it.name[lang] : l.id;
     const photo = PHOTOS.dishes[l.id];
     const art = photo
-      ? '<img src="' + photo + '" alt="" loading="lazy">'
+      ? '<img src="' + imgURL(photo, 128) + '" width="128" height="128" alt="" loading="lazy" decoding="async">'
       : (it ? inkArt(it, l.kind) : '');
     return '<div class="cline" data-key="' + l.key + '">' +
       '<span class="cline-art">' + art + '</span>' +
@@ -677,7 +702,10 @@ function renderHeroShot() {
     || Object.values(PHOTOS.dishes)[0];
   if (!pick) { fig.hidden = true; return; }
   fig.hidden = false;
-  img.src = pick;
+  img.src = imgURL(pick, 828);
+  img.srcset = imgSet(pick, [414, 640, 828, 1200]);
+  img.sizes = '(min-width: 1020px) 420px, 92vw';
+  img.width = 820; img.height = 512;
   img.alt = altFor('hero', 'Manakish fraîchement sorties du four — Boulangerie Le Four, Pierrefonds');
 }
 
@@ -695,7 +723,7 @@ function renderFeatured() {
   sec.hidden = false;
   strip.innerHTML = withPhoto.slice(0, 10).map(x =>
     '<button type="button" class="feat" data-id="' + x.it.id + '" data-cat="' + x.cat + '" data-kind="' + x.kind + '">' +
-    '<img src="' + x.u + '" alt="' + altFor('dish:' + x.it.id, x.it.name[lang]) + '" loading="lazy" decoding="async">' +
+    '<img src="' + imgURL(x.u, 400) + '" srcset="' + imgSet(x.u, [256, 400, 640]) + '" sizes="200px" width="400" height="300" alt="' + altFor('dish:' + x.it.id, x.it.name[lang]) + '" loading="lazy" decoding="async">' +
     '<span class="feat-cap"><b>' + x.it.name[lang] + '</b>' +
     (x.it.price != null ? '<i>' + fmtPrice(x.it.price) + '</i>' : '') +
     '</span></button>').join('');
@@ -787,9 +815,11 @@ function bindOrderSheet() {
 
 function setLang(l) {
   if (!UI[l]) return;
-  lang = l;
   track('language_change', { language: l });
-  localStorage.setItem('lefour-lang', l);
+  try { localStorage.setItem('lefour-lang', l); } catch (e) {}
+  /* chaque langue a son propre document (lang/dir/title/canonical corrects) */
+  if (l !== lang) { location.assign(l === 'fr' ? '/' : '/' + l); return; }
+  lang = l;
   closeSheet();
   applyI18n();
 }
@@ -869,7 +899,7 @@ function renderMenu() {
           const extra = sizeCount(item, c.kind);
           return `
           <button type="button" class="card" data-kind="${c.kind}" data-cat="${c.key}" data-id="${item.id}" data-tags="${(item.tags || []).join(',')}">
-            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${PHOTOS.dishes[item.id]}" alt="${altFor('dish:' + item.id, item.name[lang] + ' — Boulangerie Le Four')}" loading="lazy">` : inkArt(item, c.kind)}</span>
+            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${imgURL(PHOTOS.dishes[item.id], 128)}" srcset="${imgSet(PHOTOS.dishes[item.id], [128, 256])}" sizes="58px" width="128" height="128" alt="${altFor('dish:' + item.id, item.name[lang] + ' — Boulangerie Le Four')}" loading="lazy" decoding="async">` : inkArt(item, c.kind)}</span>
             <span class="card-mid">
               <span class="card-name">${item.name[lang]}</span>
               <span class="card-desc">${item.desc[lang] || ''}</span>
@@ -926,7 +956,9 @@ function openSheet(item, kind) {
   track('view_item', { item_name: (item.name && item.name.en) || item.id, item_id: item.id, item_category: kind });
   const photo = PHOTOS.dishes[item.id];
   const pf = $('#sheetPhoto');
-  if (photo) { $('#sheetPhotoImg').src = photo;
+  if (photo) { const spi = $('#sheetPhotoImg');
+    spi.src = imgURL(photo, 828); spi.srcset = imgSet(photo, [414, 640, 828]);
+    spi.sizes = '(min-width: 1020px) 420px, 92vw'; spi.width = 820; spi.height = 615;
     $('#sheetPhotoImg').alt = altFor('dish:' + item.id, item.name[lang] + ' — Boulangerie Le Four'); pf.hidden = false; $('#sheetArt').hidden = true; }
   else { pf.hidden = true; $('#sheetArt').hidden = false; }
   $('#sheetArt').innerHTML = inkArt(item, kind);

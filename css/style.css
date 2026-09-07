@@ -996,3 +996,10 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
   .feat-strip { padding-inline: 4px; }
   .sticky-bar { width: min(430px, 40%); inset-inline-end: 30px; left: auto; translate: none; }
 }
+
+/* La photo du héro réserve sa place avant d'être chargée :
+   sinon tout le panneau en dessous saute (CLS mesuré ~0,15). */
+.hero-shot { aspect-ratio: 16 / 10; }
+.hero-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.feat img, .gal-item img { aspect-ratio: 4 / 3; object-fit: cover; }
+.sheet-photo img { aspect-ratio: 4 / 3; object-fit: cover; }

@@ -2,83 +2,55 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "trailingSlash": false,
+  "images": {
+    "sizes": [64, 96, 128, 200, 256, 400, 414, 640, 828, 1080, 1200],
+    "formats": ["image/avif", "image/webp"],
+    "minimumCacheTTL": 31536000,
+    "remotePatterns": [
+      { "protocol": "https", "hostname": "*.public.blob.vercel-storage.com" }
+    ]
+  },
   "rewrites": [
-    {
-      "source": "/robots.txt",
-      "destination": "/api/seo?f=robots"
-    },
-    {
-      "source": "/sitemap.xml",
-      "destination": "/api/seo?f=sitemap"
-    },
-    {
-      "source": "/fr",
-      "destination": "/"
-    },
-    {
-      "source": "/en",
-      "destination": "/"
-    },
-    {
-      "source": "/ar",
-      "destination": "/"
-    },
-    {
-      "source": "/menu",
-      "destination": "/"
-    },
-    {
-      "source": "/traiteur",
-      "destination": "/"
-    },
-    {
-      "source": "/catering",
-      "destination": "/"
-    },
-    {
-      "source": "/contact",
-      "destination": "/"
-    },
-    {
-      "source": "/galerie",
-      "destination": "/"
-    },
-    {
-      "source": "/commander",
-      "destination": "/"
-    },
-    {
-      "source": "/order",
-      "destination": "/"
-    }
+    { "source": "/robots.txt", "destination": "/api/seo?f=robots" },
+    { "source": "/sitemap.xml", "destination": "/api/seo?f=sitemap" },
+    { "source": "/menu", "destination": "/" },
+    { "source": "/traiteur", "destination": "/" },
+    { "source": "/catering", "destination": "/" },
+    { "source": "/contact", "destination": "/" },
+    { "source": "/galerie", "destination": "/" },
+    { "source": "/commander", "destination": "/" },
+    { "source": "/order", "destination": "/" }
   ],
   "headers": [
     {
-      "source": "/admin",
+      "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow"
-        }
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com https://connect.facebook.net https://www.clarity.ms https://*.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.public.blob.vercel-storage.com https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://*.clarity.ms; connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.public.blob.vercel-storage.com https://connect.facebook.net https://www.facebook.com https://*.clarity.ms; frame-src https://www.googletagmanager.com https://www.facebook.com; manifest-src 'self'; upgrade-insecure-requests"
+        },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        {
+          "key": "Permissions-Policy",
+          "value": "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), xr-spatial-tracking=()"
+        },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "X-DNS-Prefetch-Control", "value": "on" }
       ]
+    },
+    {
+      "source": "/admin",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {
       "source": "/admin.html",
-      "headers": [
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow"
-        }
-      ]
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {
       "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
   ]
 }
