@@ -226,6 +226,18 @@ let PHOTOS = { dishes: {}, gallery: [], hero: '' };
 let PHOTOS_READY = false;
 
 /* texte alternatif éditable depuis le tableau de bord (SEO images) */
+/* Texte alternatif d'un plat, par ordre de priorite :
+   1. ce que le client a saisi dans le tableau de bord
+   2. le texte fourni avec le menu (colonne « Alt Text » du fichier client)
+   3. le nom du plat
+   Une photo televersee depuis le tableau de bord montre le meme plat, donc
+   le texte du fichier client reste juste tant que la photo n'est pas changee
+   pour autre chose — et dans ce cas le champ du tableau de bord le remplace. */
+function dishAlt(item) {
+  return altFor('dish:' + item.id,
+    (item.seo && item.seo.alt) || (item.name[lang] + ' \u2014 Boulangerie Le Four'));
+}
+
 function altFor(key, fallback) {
   const s = window.LF_SETTINGS;
   const v = s && s.alt ? s.alt[key] : '';
@@ -751,7 +763,7 @@ function renderFeatured() {
   sec.classList.add('is-ready');
   strip.innerHTML = withPhoto.slice(0, 10).map(x =>
     '<button type="button" class="feat" data-id="' + x.it.id + '" data-cat="' + x.cat + '" data-kind="' + x.kind + '">' +
-    '<img src="' + imgURL(x.u, 400) + '" srcset="' + imgSet(x.u, [256, 400, 640]) + '" sizes="200px" width="400" height="300" alt="' + altFor('dish:' + x.it.id, x.it.name[lang]) + '" loading="lazy" decoding="async">' +
+    '<img src="' + imgURL(x.u, 400) + '" srcset="' + imgSet(x.u, [256, 400, 640]) + '" sizes="200px" width="400" height="300" alt="' + dishAlt(x.it) + '" loading="lazy" decoding="async">' +
     '<span class="feat-cap"><b>' + x.it.name[lang] + '</b>' +
     (x.it.price != null ? '<i>' + fmtPrice(x.it.price) + '</i>' : '') +
     '</span></button>').join('');
@@ -927,7 +939,7 @@ function renderMenu() {
           const extra = sizeCount(item, c.kind);
           return `
           <button type="button" class="card" data-kind="${c.kind}" data-cat="${c.key}" data-id="${item.id}" data-tags="${(item.tags || []).join(',')}">
-            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${imgURL(PHOTOS.dishes[item.id], 128)}" srcset="${imgSet(PHOTOS.dishes[item.id], [128, 256])}" sizes="58px" width="128" height="128" alt="${altFor('dish:' + item.id, item.name[lang] + ' — Boulangerie Le Four')}" loading="lazy" decoding="async">` : inkArt(item, c.kind)}</span>
+            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${imgURL(PHOTOS.dishes[item.id], 128)}" srcset="${imgSet(PHOTOS.dishes[item.id], [128, 256])}" sizes="58px" width="128" height="128" alt="${dishAlt(item)}" loading="lazy" decoding="async">` : inkArt(item, c.kind)}</span>
             <span class="card-mid">
               <span class="card-name">${item.name[lang]}</span>
               <span class="card-desc">${item.desc[lang] || ''}</span>
@@ -978,7 +990,7 @@ const sheetCard = $('#sheetCard');
 let lastFocus = null;
 
 let SHEET_ITEM = null, SHEET_KIND = null;
-function openSheet(item, kind) {
+function openSheet(item, kind, fromURL) {
   SHEET_ITEM = item; SHEET_KIND = kind;
   lastFocus = document.activeElement;
   track('view_item', { item_name: (item.name && item.name.en) || item.id, item_id: item.id, item_category: kind });
@@ -987,7 +999,7 @@ function openSheet(item, kind) {
   if (photo) { const spi = $('#sheetPhotoImg');
     spi.src = imgURL(photo, 828); spi.srcset = imgSet(photo, [414, 640, 828]);
     spi.sizes = '(min-width: 1020px) 420px, 92vw'; spi.width = 820; spi.height = 615;
-    $('#sheetPhotoImg').alt = altFor('dish:' + item.id, item.name[lang] + ' — Boulangerie Le Four'); pf.hidden = false; $('#sheetArt').hidden = true; }
+    $('#sheetPhotoImg').alt = dishAlt(item); pf.hidden = false; $('#sheetArt').hidden = true; }
   else { pf.hidden = true; $('#sheetArt').hidden = false; }
   $('#sheetArt').innerHTML = inkArt(item, kind);
   $('#sheetName').textContent = item.name[lang];
@@ -1008,6 +1020,7 @@ function openSheet(item, kind) {
   sheet.classList.add('is-open');
   sheet.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
+  pushSheetURL(item, !!fromURL);
 }
 function closeSheet() {
   if (!sheet.classList.contains('is-open')) return;
@@ -1015,8 +1028,57 @@ function closeSheet() {
   sheet.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
   sheetCard.style.transform = '';
+  restoreBaseURL();
   lastFocus && lastFocus.focus && lastFocus.focus();
 }
+
+
+/* ── adresses par produit ────────────────────────────────────
+   Le client a fixe une adresse par produit (colonne « URL Slug ») et demande
+   qu'elles restent stables apres le lancement. Elles servent toutes le meme
+   document : la fiche du produit s'ouvre d'elle-meme, et l'adresse suit
+   l'ouverture et la fermeture de la fiche pour qu'un lien partage marche.
+   La balise canonique reste la page principale — trente-cinq adresses qui
+   servent le meme HTML seraient du contenu duplique aux yeux de Google. */
+const LANG_BASE = () => (lang === 'fr' ? '' : '/' + lang);
+const SLUG_RE = /^\/(?:(?:fr|en|ar)\/)?menu\/([a-z0-9-]+)\/?$/;
+
+function itemBySlug(slug) {
+  for (const c of CATS) {
+    for (const it of (MENU[c.key] || [])) {
+      if (it.seo && it.seo.slug === slug) return { item: it, kind: c.kind };
+    }
+  }
+  return null;
+}
+
+function slugPath(item) {
+  return (item && item.seo && item.seo.slug) ? LANG_BASE() + '/menu/' + item.seo.slug : '';
+}
+
+/* remplace l'entree courante quand on ouvre depuis un lien profond, sinon on
+   en empile une : le bouton « retour » referme la fiche au lieu de quitter. */
+function pushSheetURL(item, replace) {
+  const p = slugPath(item);
+  if (!p || location.pathname === p) return;
+  try { history[replace ? 'replaceState' : 'pushState']({ lf: item.seo.slug }, '', p); } catch (e) {}
+}
+
+function restoreBaseURL() {
+  if (!SLUG_RE.test(location.pathname)) return;
+  try { history.pushState({}, '', (LANG_BASE() || '/')); } catch (e) {}
+}
+
+/* l'adresse fait foi au chargement et a chaque retour arriere */
+function syncSheetToURL() {
+  const m = SLUG_RE.exec(location.pathname);
+  if (!m) { closeSheet(); return; }
+  const hit = itemBySlug(m[1]);
+  if (!hit) { restoreBaseURL(); return; }
+  openSheet(hit.item, hit.kind, true);
+}
+
+addEventListener('popstate', syncSheetToURL);
 
 /* swipe-down to close */
 (function sheetDrag() {
@@ -1065,6 +1127,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPhotos();
   setInterval(renderStatus, 60000);
   $$('[data-setlang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.setlang)));
+  syncSheetToURL();
   $$('#sheet [data-close]').forEach(el => el.addEventListener('click', closeSheet));
   addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 });

@@ -40,7 +40,7 @@ ${code}
 </script>`);
   console.log(`inlined ${(code.length / 1024).toFixed(1)}KB from ${f}`);
 }
-fs.writeFileSync(htmlPath, html);
+/* index.html is written further down, once the Menu structured data exists. */
 
 /* ── 2. per-language documents ────────────────────────────── */
 const SITE = 'https://lefour.vercel.app';
@@ -66,19 +66,83 @@ const META = {
   },
 };
 
-/* the runtime UI dictionary, so the per-language documents ship translated copy
-   in the very first byte instead of French text swapped out by JS on load */
-const UI = (() => {
+/* the runtime dictionary and the menu itself, so the per-language documents ship
+   translated copy — and the Menu structured data — in the very first byte
+   instead of French text swapped out by JavaScript on load */
+const DATA = (() => {
   try {
     const src = fs.readFileSync(`${out}/js/data.js`, 'utf8');
-    return new Function(src + ';\nreturn UI;')();
+    return new Function(src + ';\nreturn { UI, MENU };')();
   } catch (e) {
-    console.error('UI dictionary unavailable - copy left in French:', e.message);
-    return null;
+    console.error('menu data unavailable - copy left in French:', e.message);
+    return {};
   }
 })();
+const UI = DATA.UI || null;
+const MENU = DATA.MENU || null;
 
 const escHtml = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/* ── 2b. Menu structured data ─────────────────────────────────
+   The client's menu sheet gives every product a description, a stable address
+   and a keyword. Emitting them as schema.org/Menu lets Google show the dishes
+   and prices directly in search, and it is generated per language from the same
+   data.js the page renders from, so the two can never drift apart.
+   Pizzas are left out on purpose: they are hidden on the site, and marking up
+   items a visitor cannot see is exactly what Google penalises.               */
+const SECTIONS = [
+  ['manakish', 'manakishTitle'],
+  ['minis', 'minisTitle'],
+  ['mezze', 'mezzeTitle'],
+  ['drinks', 'drinksTitle'],
+];
+const DIET = { veg: 'https://schema.org/VegetarianDiet' };
+
+function menuLd(lng, base) {
+  if (!MENU || !UI || !UI[lng]) return null;
+  const dict = UI[lng];
+  const sections = [];
+  for (const [key, titleKey] of SECTIONS) {
+    const items = (MENU[key] || []).map((it) => {
+      const node = {
+        '@type': 'MenuItem',
+        name: (it.name && it.name[lng]) || it.id,
+      };
+      if (it.desc && it.desc[lng]) node.description = it.desc[lng];
+      if (it.seo && it.seo.slug) node.url = `${base}/menu/${it.seo.slug}`;
+      if (it.price != null) {
+        node.offers = { '@type': 'Offer', price: it.price.toFixed(2), priceCurrency: 'CAD' };
+      }
+      if (it.tags && it.tags.includes('veg')) node.suitableForDiet = DIET.veg;
+      return node;
+    });
+    if (items.length) {
+      sections.push({ '@type': 'MenuSection', name: dict[titleKey] || key, hasMenuItem: items });
+    }
+  }
+  if (!sections.length) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Menu',
+    '@id': `${SITE}/#menu`,
+    name: dict.carteTitle || 'Menu',
+    inLanguage: lng === 'fr' ? 'fr-CA' : lng === 'en' ? 'en-CA' : 'ar',
+    url: base + '/',
+    provider: { '@id': `${SITE}/#business` },
+    hasMenuSection: sections,
+  };
+}
+
+/* `<` is escaped so a description could never close the script element early */
+function injectMenuLd(doc, lng, base) {
+  const ld = menuLd(lng, base);
+  if (!ld) { console.error(`  ${lng}: Menu structured data skipped`); return doc; }
+  const json = JSON.stringify(ld).replace(/</g, '\\u003c');
+  const n = ld.hasMenuSection.reduce((a, s) => a + s.hasMenuItem.length, 0);
+  console.log(`  ${lng}: Menu structured data — ${ld.hasMenuSection.length} sections, ${n} items`);
+  return doc.replace('</head>', () =>
+    `  <script type="application/ld+json" id="ldMenu">${json}</script>\n</head>`);
+}
 
 const I18N_RE = /(<([a-zA-Z0-9]+)\b[^>]*\bdata-i18n="([A-Za-z0-9_]+)"[^>]*>)([^<]*)(<\/\2>)/g;
 
@@ -128,6 +192,7 @@ for (const [lng, m] of Object.entries(META)) {
 
   /* and the visible copy, so /en and /ar are not French pages repainted by JS */
   doc = translate(doc, lng);
+  doc = injectMenuLd(doc, lng, `${SITE}/${lng}`);
 
   /* the document now lives one level deep -> make every asset path absolute */
   doc = doc.replace(/(src|href)="(assets\/|js\/|css\/)/g, '$1="/$2');
@@ -137,10 +202,12 @@ for (const [lng, m] of Object.entries(META)) {
   console.log(`wrote /${lng}/index.html  (lang=${lng} dir=${m.dir})`);
 }
 
-/* /fr is the same document as the root, just addressable */
+/* the French document is the root; /fr is the same page, just addressable */
+const frDoc = injectMenuLd(html, 'fr', SITE);
+fs.writeFileSync(htmlPath, frDoc);
+console.log('wrote /index.html');
+
 fs.mkdirSync(`${out}/fr`, { recursive: true });
 fs.writeFileSync(`${out}/fr/index.html`,
-  html.replace(/(src|href)="(assets\/|js\/|css\/)/g, '$1="/$2')
-      .replace('<link rel="canonical" href="https://lefour.vercel.app/">',
-               '<link rel="canonical" href="https://lefour.vercel.app/">'));
+  frDoc.replace(/(src|href)="(assets\/|js\/|css\/)/g, (m, a, p) => `${a}="/${p}`));
 console.log('wrote /fr/index.html');
