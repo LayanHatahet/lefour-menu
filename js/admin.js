@@ -236,14 +236,102 @@ function renderAlts() {
   });
 }
 
+/* ── opening hours ───────────────────────────────────────
+   Stored as one string per weekday, "HH:MM-HH:MM", or "" for closed.
+   Key 0 is Sunday, matching SCHEDULE in data.js and JavaScript's getDay(). */
+const HOUR_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const HOUR_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const HOUR_RE = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/;
+
+function parseWin(v) {
+  const m = HOUR_RE.exec(String(v || '').trim());
+  return m ? [m[1] + ':' + m[2], m[3] + ':' + m[4]] : ['', ''];
+}
+
+/* Nothing saved yet? Show the schedule the site is actually running on
+   (SCHEDULE in data.js) instead of seven "Closed" rows the owner might
+   save by accident. Editing any row is what first writes the setting. */
+function seedHoursFromSite() {
+  const pad = (n) => String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
+  const out = {};
+  for (let d = 0; d < 7; d++) {
+    const w = (typeof SCHEDULE !== 'undefined' && SCHEDULE[d]) || null;
+    out[d] = w ? pad(w[0]) + '-' + pad(w[1]) : '';
+  }
+  return out;
+}
+
+function renderHoursEditor() {
+  const host = $('#hoursEditor');
+  if (!host) return;
+  if (!SETTINGS.hours || typeof SETTINGS.hours !== 'object') SETTINGS.hours = {};
+  const anySaved = Object.keys(SETTINGS.hours).some(k => String(SETTINGS.hours[k] || '').trim());
+  if (!anySaved) SETTINGS.hours = seedHoursFromSite();
+  host.innerHTML = HOUR_ORDER.map(d => {
+    const [o, c] = parseWin(SETTINGS.hours[d]);
+    const closed = !o;
+    return `<div class="hrow${closed ? ' is-closed' : ''}" data-day="${d}">
+      <span class="hday">${HOUR_DAYS[d]}</span>
+      <input type="time" data-open value="${o || '06:30'}"${closed ? ' disabled' : ''}>
+      <span class="hdash">to</span>
+      <input type="time" data-close value="${c || '17:00'}"${closed ? ' disabled' : ''}>
+      <label class="hclosed"><input type="checkbox" data-closed${closed ? ' checked' : ''}> Closed</label>
+    </div>`;
+  }).join('');
+  $$('#hoursEditor .hrow').forEach(row => {
+    row.querySelectorAll('input').forEach(i =>
+      i.addEventListener('change', () => commitHours(row)));
+  });
+  validateHours();
+}
+
+function commitHours(row) {
+  const d = row.dataset.day;
+  const closed = row.querySelector('[data-closed]').checked;
+  const o = row.querySelector('[data-open]');
+  const c = row.querySelector('[data-close]');
+  o.disabled = c.disabled = closed;
+  row.classList.toggle('is-closed', closed);
+  SETTINGS.hours[d] = closed ? '' : `${o.value}-${c.value}`;
+  validateHours();
+  markDirty();
+}
+
+/* A closing time at or before the opening time would make the site read as
+   closed all day, so the save button is held until it is fixed. */
+function validateHours() {
+  const bad = [];
+  $$('#hoursEditor .hrow').forEach(row => {
+    const closed = row.querySelector('[data-closed]').checked;
+    const o = row.querySelector('[data-open]').value;
+    const c = row.querySelector('[data-close]').value;
+    const wrong = !closed && !(o < c);
+    row.classList.toggle('is-bad', wrong);
+    if (wrong) bad.push(HOUR_DAYS[row.dataset.day]);
+  });
+  const err = $('#hoursErr');
+  if (err) {
+    err.textContent = bad.length
+      ? 'Closing time must be later than opening time: ' + bad.join(', ')
+      : '';
+    err.hidden = !bad.length;
+  }
+  const btn = $('#saveBtn');
+  if (btn) btn.disabled = bad.length > 0;
+  return !bad.length;
+}
+
 async function loadSettings() {
   const j = await api('/api/settings');
   SETTINGS = j.settings || {};
   fillSettingsForm();
   renderAlts();
+  renderHoursEditor();
 }
 
 async function saveSettings() {
+  /* checked before the button is touched, so the guard survives the finally */
+  if (!validateHours()) { toast('Fix the opening hours first'); return; }
   const btn = $('#saveBtn');
   btn.disabled = true;
   $('#saveHint').textContent = 'Saving…';

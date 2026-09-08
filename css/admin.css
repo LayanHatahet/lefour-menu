@@ -98,3 +98,19 @@ box-shadow:0 14px 34px rgba(0,0,0,.24)}
 .savebar .solid{background:var(--ivory);color:var(--ink);border:none;border-radius:99px;padding:10px 22px;
 font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
 .savebar .solid:disabled{opacity:.5}
+
+/* ── opening hours editor ── */
+.hours{display:grid;gap:8px}
+.hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;
+border:1px solid var(--hair);border-radius:12px;background:var(--paper)}
+.hrow.is-closed{opacity:.62}
+.hday{flex:0 0 104px;font-family:var(--serif);font-weight:480;font-size:.98rem}
+.hrow input[type=time]{font-family:inherit;font-size:.9rem;color:var(--ink);background:var(--ivory);
+border:1px solid var(--hair);border-radius:10px;padding:8px 10px}
+.hrow input[type=time]:disabled{opacity:.4}
+.hrow input[type=time]:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(110,122,53,.14)}
+.hdash{font-size:.8rem;opacity:.5}
+.hclosed{display:flex;align-items:center;gap:6px;margin-inline-start:auto;
+font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--olive);cursor:pointer}
+.hrow.is-bad{border-color:#8A4A38}
+@media (max-width:560px){.hday{flex:0 0 100%}.hclosed{margin-inline-start:0}}

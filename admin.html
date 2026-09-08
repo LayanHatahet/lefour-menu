@@ -89,8 +89,19 @@
           <label class="fld"><span>Business name</span><input data-set="bizName" placeholder="Boulangerie Le Four"></label>
           <label class="fld"><span>Phone</span><input data-set="phone" placeholder="(514) 624-3330"></label>
           <label class="fld"><span>Email</span><input data-set="email" placeholder="info@lefourboulangerie.com"></label>
-          <label class="fld"><span>Address</span><input data-set="address" placeholder="15708 Boul. de Pierrefonds…"></label>
+          <label class="fld"><span>Street address</span><input data-set="address" placeholder="15708 Boul. de Pierrefonds"></label>
+          <label class="fld"><span>City</span><input data-set="city" placeholder="Pierrefonds"></label>
+          <label class="fld"><span>Province</span><input data-set="province" placeholder="QC"></label>
+          <label class="fld"><span>Postal code</span><input data-set="postalCode" placeholder="H9H 3P6"></label>
         </div>
+        <p class="muted">Google reads these four fields separately. Keep them exactly as they appear on your Google Business Profile.</p>
+      </section>
+
+      <section class="block">
+        <h2>Opening hours</h2>
+        <p class="muted">Drives the Open / Closed badge, the hours table on the site and the hours Google shows. Times are Montreal time.</p>
+        <div class="hours" id="hoursEditor"></div>
+        <p class="err" id="hoursErr" hidden></p>
       </section>
       <section class="block">
         <h2>Social accounts</h2>

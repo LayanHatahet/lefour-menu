@@ -1,6 +1,5 @@
 /* GET  /api/settings          -> public settings JSON (marketing + SEO)
-   POST /api/settings (admin)  -> { settings: {...} }  saves the whole object
-   Stored as a single JSON blob: config/settings.json                       */
+   POST /api/settings (admin)  -> { settings: {...} } */
 
 const BLOB = 'https://blob.vercel-storage.com';
 const V = '7';
@@ -11,26 +10,42 @@ const FALLBACK_ADMIN = 'lefour2026';
 function token() { return process.env.BLOB_READ_WRITE_TOKEN || ''; }
 function adminKey() { return process.env.ADMIN_PASSWORD || FALLBACK_ADMIN; }
 
-/* every key the dashboard can edit, with safe defaults */
 const DEFAULTS = {
-  /* analytics / marketing ids */
-  ga4: '',            // G-XXXXXXXXXX
-  gtm: '',            // GTM-XXXXXXX
-  metaPixel: '',      // 15-16 digit id
-  clarity: '',        // Microsoft Clarity project id
-  gscVerify: '',      // google-site-verification token
-  /* seo */
+  ga4: '',
+  gtm: '',
+  metaPixel: '',
+  clarity: '',
+  gscVerify: '',
   seoTitle: { fr: '', en: '', ar: '' },
   seoDesc:  { fr: '', en: '', ar: '' },
   ogImage: '',
   keywords: '',
-  /* business / local seo (NAP) */
-  bizName: '', address: '', phone: '', email: '',
-  /* social */
+  bizName: '', phone: '', email: '',
+  /* the address is kept in its four components: Google reads them separately
+     and the site composes the one-line version for display */
+  address: '', city: '', province: '', postalCode: '',
+  /* one "HH:MM-HH:MM" per weekday, '' = closed. 0 is Sunday, like getDay(). */
+  hours: { 0: '', 1: '', 2: '', 3: '', 4: '', 5: '', 6: '' },
   instagram: '', facebook: '', tiktok: '',
-  /* per-image alt text: { 'dish:zaatar': '...', 'gallery:<url>': '...' } */
   alt: {},
 };
+
+const HOURS_RE = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/;
+
+/* merge() is deliberately generic, so the one field the site computes with
+   gets checked here: anything that is not a real window becomes '' (closed)
+   rather than reaching renderStatus() as garbage. */
+function cleanHours(h) {
+  const out = {};
+  for (let d = 0; d < 7; d++) {
+    const v = String((h && h[d]) || '').trim();
+    const m = HOURS_RE.exec(v);
+    if (!m) { out[d] = ''; continue; }
+    const a = +m[1] * 60 + +m[2], b = +m[3] * 60 + +m[4];
+    out[d] = b > a ? v : '';
+  }
+  return out;
+}
 
 function merge(base, incoming) {
   const out = {};
@@ -55,7 +70,9 @@ async function findBlob() {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('cache-control', 'no-store');
+  res.setHeader('cache-control', req.method === 'GET'
+    ? 'public, max-age=0, s-maxage=60, stale-while-revalidate=600'
+    : 'no-store');
 
   if (req.method === 'POST' && (req.headers['x-admin-key'] || '') !== adminKey()) {
     return res.status(401).json({ error: 'unauthorized' });
@@ -71,12 +88,15 @@ module.exports = async (req, res) => {
       if (!b) return res.status(200).json({ settings: DEFAULTS, configured: true });
       const r = await fetch(b.url + `?t=${Date.now()}`, { cache: 'no-store' });
       const saved = r.ok ? await r.json().catch(() => ({})) : {};
-      return res.status(200).json({ settings: merge(DEFAULTS, saved), configured: true });
+      const out = merge(DEFAULTS, saved);
+      out.hours = cleanHours(out.hours);
+      return res.status(200).json({ settings: out, configured: true });
     }
 
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
       const clean = merge(DEFAULTS, body.settings || {});
+      clean.hours = cleanHours(clean.hours);
       const put = await fetch(`${BLOB}/${PATH}`, {
         method: 'PUT',
         headers: {

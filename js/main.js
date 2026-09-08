@@ -372,6 +372,19 @@ function applySeo() {
       if (st.phone) j.telephone = st.phone;
       if (st.email) j.email = st.email;
       if (st.ogImage) j.image = st.ogImage;
+      /* Google lit chaque composante separement, d'ou les champs distincts */
+      if (st.address || st.city || st.province || st.postalCode) {
+        j.address = {
+          '@type': 'PostalAddress',
+          streetAddress: st.address || j.address.streetAddress,
+          addressLocality: st.city || j.address.addressLocality,
+          addressRegion: st.province || j.address.addressRegion,
+          postalCode: st.postalCode || j.address.postalCode,
+          addressCountry: 'CA',
+        };
+      }
+      const sc = settingsSchedule();
+      if (sc) j.openingHoursSpecification = openingSpec(sc);
       const sameAs = [st.instagram, st.facebook, st.tiktok].filter(Boolean);
       if (sameAs.length) j.sameAs = sameAs;
       ld.textContent = JSON.stringify(j);
@@ -455,10 +468,13 @@ function wireInfo() {
       const tel2 = 'tel:' + String(st.phone).replace(/[^+0-9]/g, '');
       ['#lnkCall2', '#osCall', '#cCall'].forEach(sel => { const el = $(sel); if (el) el.href = tel2; });
     }
-    if (st.address) { const a = $('#cAddr'); if (a) a.textContent = st.address; }
+    const addr = fullAddress(st);
+    if (addr) { const a = $('#cAddr'); if (a) a.textContent = addr; }
     if (st.email) { const m = $('#cMail'); if (m) { m.href = 'mailto:' + st.email; m.textContent = st.email; } }
     applySeo();
     renderMenu();
+    renderHours();
+    renderStatus();
   });
   wirePickupMsgs();
 }
@@ -480,11 +496,59 @@ function montrealNow() {
   return { day: dayIdx, mins: parseInt(get('hour'), 10) % 24 * 60 + parseInt(get('minute'), 10) };
 }
 
+/* ── horaire et adresse modifiables depuis le tableau de bord ─
+   Les heures arrivent en "HH:MM-HH:MM" par jour (0 = dimanche), "" = ferme.
+   Une seule valeur mal formee et on garde SCHEDULE : mieux vaut l'horaire
+   d'origine qu'un commerce affiche ferme toute la semaine par erreur. */
+const HOURS_RE = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/;
+
+function settingsSchedule() {
+  const st = window.LF_SETTINGS;
+  const h = st && st.hours;
+  if (!h || typeof h !== 'object') return null;
+  const out = {};
+  let openDays = 0;
+  for (let d = 0; d < 7; d++) {
+    const v = String(h[d] == null ? '' : h[d]).trim();
+    if (!v) { out[d] = null; continue; }
+    const m = HOURS_RE.exec(v);
+    if (!m) return null;
+    const a = +m[1] * 60 + +m[2], b = +m[3] * 60 + +m[4];
+    if (b <= a) return null;
+    out[d] = [a, b];
+    openDays++;
+  }
+  /* tout vide = le proprietaire n'a rien saisi, pas "ferme sept jours sur sept" */
+  return openDays ? out : null;
+}
+
+function schedule() { return settingsSchedule() || SCHEDULE; }
+
+function fullAddress(st) {
+  if (!st) return '';
+  const region = [st.province, st.postalCode].filter(Boolean).join(' ');
+  const parts = [st.address, st.city, region].map(v => String(v || '').trim()).filter(Boolean);
+  return parts.join(', ');
+}
+
+/* "06:30-17:00" -> { opens: '06:30', closes: '17:00' } pour schema.org */
+const LD_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function openingSpec(sc) {
+  const spec = [];
+  for (let d = 0; d < 7; d++) {
+    const w = sc[d];
+    if (!w) continue;
+    const pad = (n) => String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
+    spec.push({ '@type': 'OpeningHoursSpecification', dayOfWeek: [LD_DAYS[d]], opens: pad(w[0]), closes: pad(w[1]) });
+  }
+  return spec;
+}
+
 function renderStatus() {
   const badge = $('#statusBadge');
   if (!badge) return;
   const { day, mins } = montrealNow();
-  const win = SCHEDULE[day];
+  const win = schedule()[day];
   const open = !!win && mins >= win[0] && mins < win[1];
   badge.classList.toggle('status--open', open);
   badge.classList.toggle('status--closed', !open);
@@ -795,7 +859,7 @@ function renderHours() {
   const names = DAY_NAMES[lang] || DAY_NAMES.fr;
   const order = [1, 2, 3, 4, 5, 6, 0];
   el.innerHTML = order.map(d => {
-    const w = SCHEDULE[d];
+    const w = schedule()[d];
     return '<div class="h-row' + (d === today ? ' is-today' : '') + (w ? '' : ' h-closed') + '">' +
       '<span>' + names[d] + (d === today ? ' <i>' + t('hoursToday') + '</i>' : '') + '</span>' +
       '<b>' + (w ? '\u200E' + hhmm(w[0]) + ' – ' + hhmm(w[1]) + '\u200E' : t('closed')) + '</b>' +
