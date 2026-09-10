@@ -71,7 +71,12 @@ async function load() {
   renderHero();
   renderGallery();
   renderDishes();
-  await loadSettings();
+  /* an upload reloads the photo lists; edits not saved yet (a position just
+     set, a half-typed title) must survive that, so settings are re-read only
+     when nothing is pending */
+  if (!DIRTY || !SETTINGS) await loadSettings();
+  else renderAlts();
+  applyAdminPositions();
 }
 
 
@@ -80,15 +85,17 @@ function renderHero() {
   const url = DATA.hero || '';
   const thumb = $('#heroThumb'), del = $('#heroDel'), label = $('#heroLabel');
   if (!thumb) return;
-  thumb.innerHTML = url ? `<img src="${url}" alt="" loading="lazy">` : 'none';
+  thumb.innerHTML = url ? `<img src="${url}" alt="" loading="lazy" data-photo="${url}">` : 'none';
   del.hidden = !url;
+  const adj = $('#heroAdj');
+  if (adj) { adj.hidden = !url; adj.dataset.adj = url; }
   label.firstChild.textContent = url ? 'Replace' : 'Add';
 }
 
 /* ── gallery ────────────────────────────────────────────── */
 function renderGallery() {
   $('#galList').innerHTML = DATA.gallery.map(u => `
-    <figure><img src="${u}" alt="" loading="lazy"><button data-del="${u}" title="Delete">✕</button></figure>
+    <figure><img src="${u}" alt="" loading="lazy" data-photo="${u}"><button data-del="${u}" title="Delete">✕</button><button class="gpos" data-adj="${u}" data-kind="gallery" data-name="Gallery photo">Position</button></figure>
   `).join('') || '<p class="muted">No photos yet.</p>';
   $$('#galList [data-del]').forEach(b => b.addEventListener('click', () => removePhoto(b.dataset.del)));
 }
@@ -102,9 +109,10 @@ function renderDishes() {
     return `<p class="cat-h">${c.label}</p>` + items.map(it => {
       const url = DATA.dishes[it.id];
       return `<div class="row" data-id="${it.id}">
-        <span class="thumb">${url ? `<img src="${url}" alt="" loading="lazy">` : 'none'}</span>
+        <span class="thumb">${url ? `<img src="${url}" alt="" loading="lazy" data-photo="${url}">` : 'none'}</span>
         <span class="rname">${it.name.en}<small>${it.id}</small></span>
         <span class="ract">
+          ${url ? `<button class="adj" data-adj="${url}" data-kind="dish" data-name="${String(it.name.en).replace(/"/g, '&quot;')}">Position</button>` : ''}
           <label>${url ? 'Replace' : 'Add'}<input type="file" accept="image/*" hidden data-dish="${it.id}"></label>
           ${url ? `<button class="del" data-deldish="${url}">Remove</button>` : ''}
         </span>
@@ -177,11 +185,18 @@ const TRACKED_EVENTS = [
   ['language_change', 'Language switch'],
 ];
 
+/* "alt.gallery:https://….jpg": only the FIRST dot separates the group from
+   the key. Photo URLs carry dots of their own, and splitting on all of them
+   saved gallery alt text under nested keys the site never read. */
+function splitPath(path) {
+  const i = path.indexOf('.');
+  return i < 0 ? [path] : [path.slice(0, i), path.slice(i + 1)];
+}
 function getPath(obj, path) {
-  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  return splitPath(path).reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 function setPath(obj, path, val) {
-  const keys = path.split('.');
+  const keys = splitPath(path);
   let o = obj;
   for (let i = 0; i < keys.length - 1; i++) { if (typeof o[keys[i]] !== 'object' || o[keys[i]] === null) o[keys[i]] = {}; o = o[keys[i]]; }
   o[keys[keys.length - 1]] = val;
@@ -219,12 +234,12 @@ function renderAlts() {
   const rows = [];
   CATS.forEach(c => (MENU[c.key] || []).forEach(it => {
     if (!DATA.dishes[it.id]) return;
-    rows.push(`<div class="row"><span class="thumb"><img src="${DATA.dishes[it.id]}" alt="" loading="lazy"></span>
+    rows.push(`<div class="row"><span class="thumb"><img src="${DATA.dishes[it.id]}" alt="" loading="lazy" data-photo="${DATA.dishes[it.id]}"></span>
       <span class="rname">${it.name.en}<small>${it.id}</small></span>
       <input class="altin" data-set="alt.dish:${it.id}" placeholder="Describe this photo…"></div>`);
   }));
   DATA.gallery.forEach((u, i) => {
-    rows.push(`<div class="row"><span class="thumb"><img src="${u}" alt="" loading="lazy"></span>
+    rows.push(`<div class="row"><span class="thumb"><img src="${u}" alt="" loading="lazy" data-photo="${u}"></span>
       <span class="rname">Gallery photo ${i + 1}</span>
       <input class="altin" data-set="alt.gallery:${u}" placeholder="Describe this photo…"></div>`);
   });
@@ -234,6 +249,7 @@ function renderAlts() {
     el.value = (v == null ? '' : v);
     el.addEventListener('input', () => { setPath(SETTINGS, el.dataset.set, el.value); markDirty(); });
   });
+  applyAdminPositions();
 }
 
 /* ── opening hours ───────────────────────────────────────
@@ -324,6 +340,7 @@ function validateHours() {
 async function loadSettings() {
   const j = await api('/api/settings');
   SETTINGS = j.settings || {};
+  if (!SETTINGS.pos || typeof SETTINGS.pos !== 'object') SETTINGS.pos = {};
   fillSettingsForm();
   renderAlts();
   renderHoursEditor();
@@ -336,6 +353,7 @@ async function saveSettings() {
   btn.disabled = true;
   $('#saveHint').textContent = 'Saving…';
   try {
+    prunePositions();
     await api('/api/settings', { method: 'POST', body: JSON.stringify({ settings: SETTINGS }) });
     DIRTY = false;
     $('#saveHint').textContent = 'Saved ✓';
@@ -357,6 +375,142 @@ function bindTabs() {
   if (sb) sb.addEventListener('click', saveSettings);
   addEventListener('beforeunload', (e) => { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
 }
+
+/* ── photo position (focal point) ────────────────────────────
+   On the site every photo is cropped to fill its frame (object-fit: cover):
+   a round 58px menu thumbnail, 4:3 cards, the 16:10 home photo. The owner
+   drags a point onto the part that must stay visible and watches each real
+   frame update. Stored per photo URL in SETTINGS.pos as "X% Y%", so a
+   replaced photo starts centred instead of inheriting another photo's crop. */
+const PE_FRAMES = {
+  /* same aspect ratios as css/style.css; the crop depends on the ratio only,
+     so previews can be drawn smaller than the real frame */
+  dish: [
+    { label: 'Menu list', note: 'round, 58 px', w: 58, h: 58, r: '50%' },
+    { label: 'Featured strip', note: '4:3', w: 200, h: 150, r: '18px 18px 0 0' },
+    { label: 'Dish details', note: '4:3', w: 280, h: 210, r: '18px' },
+    { label: 'Cart', note: 'square', w: 54, h: 54, r: '11px' },
+  ],
+  hero: [{ label: 'Home page, under the logo', note: '16:10', w: 300, h: 188, r: '20px' }],
+  gallery: [{ label: 'Chez nous gallery', note: '4:3', w: 300, h: 225, r: '18px' }],
+};
+const PE_HERO_FALLBACK = { label: 'Home page (until a home photo is uploaded)', note: '16:10', w: 300, h: 188, r: '20px' };
+
+let PE = null;
+
+function posOf(url) {
+  const v = String((SETTINGS && SETTINGS.pos && SETTINGS.pos[url]) || '');
+  const m = /^(\d{1,3}(?:\.\d{1,2})?)% (\d{1,3}(?:\.\d{1,2})?)%$/.exec(v);
+  return m && +m[1] <= 100 && +m[2] <= 100 ? v : '50% 50%';
+}
+
+function applyAdminPositions() {
+  $$('img[data-photo]').forEach(img => { img.style.objectPosition = posOf(img.dataset.photo); });
+}
+
+/* the photo the site puts on the home page while none is uploaded —
+   keep in step with renderHeroShot() in main.js */
+function heroFallback() {
+  const pref = ['zaatar', 'zaatar-cheese', 'cheese', 'lahm'];
+  return pref.map(id => DATA.dishes[id]).find(Boolean) || Object.values(DATA.dishes)[0] || '';
+}
+
+/* positions of deleted photos are dropped on save */
+function prunePositions() {
+  if (!SETTINGS || !SETTINGS.pos) return;
+  const live = new Set([DATA.hero, ...(DATA.gallery || []), ...Object.values(DATA.dishes || {})].filter(Boolean));
+  Object.keys(SETTINGS.pos).forEach(k => { if (!live.has(k)) delete SETTINGS.pos[k]; });
+}
+
+function openPosEditor(url, kind, name) {
+  if (!url || !SETTINGS) return;
+  const start = posOf(url);
+  const [x, y] = start.split(' ').map(parseFloat);
+  PE = { url, x, y, start, drag: false };
+  $('#peTitle').textContent = name ? name + ' \u2014 position' : 'Photo position';
+  const frames = (PE_FRAMES[kind] || PE_FRAMES.dish).slice();
+  if (kind === 'dish' && !DATA.hero && heroFallback() === url) frames.push(PE_HERO_FALLBACK);
+  $('#peFrames').innerHTML = frames.map(f => `<figure class="pe-fr">
+      <span class="pe-box" style="width:${f.w}px;aspect-ratio:${f.w}/${f.h};border-radius:${f.r}"><img src="${url}" alt="" data-photo="${url}"></span>
+      <figcaption>${f.label}<small>${f.note}</small></figcaption>
+    </figure>`).join('');
+  $('#peImg').src = url;
+  $('#posEditor').hidden = false;
+  document.body.classList.add('pe-open');
+  paintPos();
+  $('#peStage').focus({ preventScroll: true });
+}
+
+function paintPos() {
+  if (!PE) return;
+  const dot = $('#peDot');
+  dot.style.left = PE.x + '%';
+  dot.style.top = PE.y + '%';
+  $('#peVal').textContent = 'Left ' + PE.x + '%  \u00b7  Top ' + PE.y + '%';
+  applyAdminPositions();
+}
+
+function setPos(x, y) {
+  if (!PE) return;
+  PE.x = Math.round(Math.min(100, Math.max(0, x)));
+  PE.y = Math.round(Math.min(100, Math.max(0, y)));
+  const v = PE.x + '% ' + PE.y + '%';
+  if (v === '50% 50%') delete SETTINGS.pos[PE.url]; else SETTINGS.pos[PE.url] = v;
+  if (v !== PE.start) markDirty();
+  paintPos();
+}
+
+function closePosEditor(keep) {
+  if (!PE) return;
+  if (!keep) {
+    if (PE.start === '50% 50%') delete SETTINGS.pos[PE.url]; else SETTINGS.pos[PE.url] = PE.start;
+    applyAdminPositions();
+  }
+  const changed = keep && posOf(PE.url) !== PE.start;
+  PE = null;
+  $('#posEditor').hidden = true;
+  document.body.classList.remove('pe-open');
+  $('#peImg').removeAttribute('src');
+  if (changed) toast('Position set \u2014 click Save changes to publish');
+}
+
+(function bindPosEditor() {
+  const stage = $('#peStage');
+  if (!stage) return;
+  const fromEvent = (e) => {
+    const r = $('#peImg').getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    setPos((e.clientX - r.left) / r.width * 100, (e.clientY - r.top) / r.height * 100);
+  };
+  stage.addEventListener('pointerdown', (e) => {
+    if (!PE) return;
+    e.preventDefault();
+    stage.setPointerCapture(e.pointerId);
+    PE.drag = true;
+    fromEvent(e);
+  });
+  stage.addEventListener('pointermove', (e) => { if (PE && PE.drag) fromEvent(e); });
+  ['pointerup', 'pointercancel'].forEach(t => stage.addEventListener(t, () => { if (PE) PE.drag = false; }));
+  stage.addEventListener('keydown', (e) => {
+    const k = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!k || !PE) return;
+    e.preventDefault();
+    const step = e.shiftKey ? 5 : 1;
+    setPos(PE.x + k[0] * step, PE.y + k[1] * step);
+  });
+  $('#peReset').addEventListener('click', () => setPos(50, 50));
+  $('#peDone').addEventListener('click', () => closePosEditor(true));
+  $('#peCancel').addEventListener('click', () => closePosEditor(false));
+  $('#posEditor').addEventListener('click', (e) => { if (e.target.id === 'posEditor') closePosEditor(true); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && PE) closePosEditor(true); });
+  /* one delegated listener: the photo lists are re-rendered after every upload */
+  $('#app').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-adj]');
+    if (!b || !b.dataset.adj) return;
+    e.preventDefault();
+    openPosEditor(b.dataset.adj, b.dataset.kind, b.dataset.name || '');
+  });
+})();
 
 /* ── login gate ─────────────────────────────────────────── */
 let TABS_BOUND = false;

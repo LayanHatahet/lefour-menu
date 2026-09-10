@@ -108,9 +108,9 @@
         <div class="grid2">
           <label class="fld"><span>Instagram URL</span><input data-set="instagram" placeholder="https://www.instagram.com/lefourboulangerie/"></label>
           <label class="fld"><span>Facebook URL</span><input data-set="facebook" placeholder="https://www.facebook.com/boulangerielefour/"></label>
-          <label class="fld"><span>TikTok URL</span><input data-set="tiktok" placeholder="https://www.tiktok.com/@…"></label>
+          <label class="fld"><span>TikTok URL</span><input data-set="tiktok" placeholder="https://www.tiktok.com/@lefourboulangerie"></label>
         </div>
-        <p class="muted">The TikTok icon appears on the site as soon as you add a link.</p>
+        <p class="muted">Leave a field empty to keep the official profile shown in grey. All three are listed for Google as the bakery's official accounts.</p>
       </section>
     </div>
 
@@ -123,6 +123,7 @@
         <span class="thumb" id="heroThumb">none</span>
         <span class="rname">Hero photo<small>hero</small></span>
         <span class="ract">
+          <button class="adj" id="heroAdj" data-kind="hero" data-name="Home page photo" hidden>Position</button>
           <label id="heroLabel">Add<input type="file" accept="image/*" hidden id="heroInput"></label>
           <button class="del" id="heroDel" hidden>Remove</button>
         </span>
@@ -131,7 +132,7 @@
 
     <section class="block">
       <h2>Restaurant gallery</h2>
-      <p class="muted">Photos of the shop, shown in the “Chez nous” section of the menu.</p>
+      <p class="muted">Photos of the shop, shown in the “Chez nous” section of the menu. Use <b>Position</b> on a photo to choose its framing.</p>
       <label class="drop" id="galDrop">
         <input type="file" accept="image/*" multiple hidden id="galInput">
         <span>+ Add photos</span>
@@ -141,7 +142,7 @@
 
     <section class="block">
       <h2>Dish photos</h2>
-      <p class="muted">One photo per dish. It shows on the menu card and in the dish details.</p>
+      <p class="muted">One photo per dish. It shows on the menu card and in the dish details. Use <b>Position</b> to choose which part of the photo stays visible in each frame.</p>
       <div id="dishList"></div>
     </section>
     </div><!-- /pane-photos -->
@@ -150,6 +151,40 @@
   <div class="savebar" id="saveBar" hidden>
     <span id="saveHint">Unsaved changes</span>
     <button class="solid" id="saveBtn">Save changes</button>
+  </div>
+
+  <!-- photo position editor -->
+  <div class="pe" id="posEditor" hidden>
+    <div class="pe-card" role="dialog" aria-modal="true" aria-labelledby="peTitle">
+      <header class="pe-head">
+        <div>
+          <h2 id="peTitle">Photo position</h2>
+          <p class="muted">Each photo is cropped to fit its frame on the site. Put the dot on the part that must always stay visible.</p>
+        </div>
+        <div class="pe-actions">
+          <button class="mini" id="peCancel" type="button">Cancel</button>
+          <button class="solid" id="peDone" type="button">Done</button>
+        </div>
+      </header>
+      <div class="pe-body">
+        <div>
+          <p class="pe-label">Full photo &mdash; click or drag</p>
+          <div class="pe-stage" id="peStage" tabindex="0" aria-label="Photo position. Arrow keys move the point.">
+            <img id="peImg" alt="">
+            <span class="pe-dot" id="peDot"></span>
+          </div>
+          <div class="pe-tools">
+            <span id="peVal"></span>
+            <button class="mini" id="peReset" type="button">Center</button>
+          </div>
+        </div>
+        <div>
+          <p class="pe-label">What customers will see</p>
+          <div class="pe-frames" id="peFrames"></div>
+          <p class="pe-note">Goes live after you click <b>Save changes</b>.</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast" hidden></div>

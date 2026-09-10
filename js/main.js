@@ -271,7 +271,7 @@ function renderGallery() {
   if (!PHOTOS.gallery.length) { sec.hidden = true; return; }
   sec.hidden = false;
   strip.innerHTML = PHOTOS.gallery.map((u, i) =>
-    `<figure class="gal-item"><img src="${imgURL(u, 400)}" srcset="${imgSet(u, [256, 400, 640])}" sizes="220px" width="400" height="300" alt="${altFor('gallery:' + u, 'Boulangerie Le Four \u2014 Pierrefonds')}" loading="lazy" decoding="async"></figure>`).join('');
+    `<figure class="gal-item"><img src="${imgURL(u, 400)}"${photoAttrs(u)} srcset="${imgSet(u, [256, 400, 640])}" sizes="220px" width="400" height="300" alt="${altFor('gallery:' + u, 'Boulangerie Le Four \u2014 Pierrefonds')}" loading="lazy" decoding="async"></figure>`).join('');
 }
 
 /* Priorité de la langue :
@@ -385,8 +385,11 @@ function applySeo() {
       }
       const sc = settingsSchedule();
       if (sc) j.openingHoursSpecification = openingSpec(sc);
-      const sameAs = [st.instagram, st.facebook, st.tiktok].filter(Boolean);
-      if (sameAs.length) j.sameAs = sameAs;
+      /* un profil saisi dans le tableau de bord remplace celui de son reseau
+         sans effacer les autres : ne remplir que TikTok ne doit pas faire
+         disparaitre Instagram et Facebook du JSON-LD */
+      j.sameAs = [st.instagram || INFO.instagram, st.facebook || INFO.facebook,
+                  st.tiktok || INFO.tiktok].filter(Boolean);
       ld.textContent = JSON.stringify(j);
     } catch (e) { /* garder le JSON-LD statique */ }
   }
@@ -458,6 +461,7 @@ function wireInfo() {
   $('#lnkReview').href = INFO.review;
   $('#socIG').href = INFO.instagram;
   $('#socFB').href = INFO.facebook;
+  $('#socTT').href = INFO.tiktok;
   document.addEventListener('lf-settings', (e) => {
     const st = e.detail || {};
     if (st.instagram) $('#socIG').href = st.instagram;
@@ -659,6 +663,30 @@ function imgSet(url, widths) {
   return widths.map(w => imgURL(url, w) + ' ' + w + 'w').join(', ');
 }
 
+/* ── cadrage des photos ───────────────────────────────────────
+   Chaque photo remplit son cadre (object-fit: cover) : rond de 58 px,
+   carte 4:3, photo du haut 16:10. Le point choisi dans le tableau de bord
+   ("X% Y%", par URL de photo) reste visible dans tous ces cadres.
+   La valeur finit dans un attribut style : on n'accepte que deux pourcentages. */
+function posFor(url) {
+  const s = window.LF_SETTINGS;
+  const v = String((s && s.pos && url && s.pos[url]) || '');
+  const m = /^(\d{1,3}(?:\.\d{1,2})?)% (\d{1,3}(?:\.\d{1,2})?)%$/.exec(v);
+  return m && +m[1] <= 100 && +m[2] <= 100 ? v : '';
+}
+function photoAttrs(url) {
+  const p = posFor(url);
+  return ' data-photo="' + url + '"' + (p ? ' style="object-position:' + p + '"' : '');
+}
+/* les reglages arrivent avant ou apres les photos selon le reseau :
+   un changement de cadrage ne touche pas la mise en page (aucun CLS) */
+function applyPositions() {
+  document.querySelectorAll('img[data-photo]').forEach(img => {
+    img.style.objectPosition = posFor(img.dataset.photo);
+  });
+}
+document.addEventListener('lf-settings', applyPositions);
+
 /* ══════════ PANIER ══════════════════════════════════════
    Le client veut pouvoir ajouter un plat dès qu'il voit sa photo.
    Rien n'est encaissé ici : la commande part sur WhatsApp. */
@@ -704,7 +732,7 @@ function cartRender() {
     const name = it ? it.name[lang] : l.id;
     const photo = PHOTOS.dishes[l.id];
     const art = photo
-      ? '<img src="' + imgURL(photo, 128) + '" width="128" height="128" alt="" loading="lazy" decoding="async">'
+      ? '<img src="' + imgURL(photo, 128) + '"' + photoAttrs(photo) + ' width="128" height="128" alt="" loading="lazy" decoding="async">'
       : (it ? inkArt(it, l.kind) : '');
     return '<div class="cline" data-key="' + l.key + '">' +
       '<span class="cline-art">' + art + '</span>' +
@@ -804,6 +832,7 @@ function renderHeroShot() {
   if (!pick) { if (PHOTOS_READY) fig.hidden = true; return; }
   fig.hidden = false;
   img.src = imgURL(pick, 640);
+  img.dataset.photo = pick; img.style.objectPosition = posFor(pick);
   /* .hero-shot fait au plus min(300px, 72vw) : annoncer 420px/92vw faisait
      telecharger un 828px la ou 640px suffit (remarque n.4, images mobiles) */
   img.srcset = imgSet(pick, [414, 640, 828]);
@@ -827,7 +856,7 @@ function renderFeatured() {
   sec.classList.add('is-ready');
   strip.innerHTML = withPhoto.slice(0, 10).map(x =>
     '<button type="button" class="feat" data-id="' + x.it.id + '" data-cat="' + x.cat + '" data-kind="' + x.kind + '">' +
-    '<img src="' + imgURL(x.u, 400) + '" srcset="' + imgSet(x.u, [256, 400, 640]) + '" sizes="200px" width="400" height="300" alt="' + dishAlt(x.it) + '" loading="lazy" decoding="async">' +
+    '<img src="' + imgURL(x.u, 400) + '"' + photoAttrs(x.u) + ' srcset="' + imgSet(x.u, [256, 400, 640]) + '" sizes="200px" width="400" height="300" alt="' + dishAlt(x.it) + '" loading="lazy" decoding="async">' +
     '<span class="feat-cap"><b>' + x.it.name[lang] + '</b>' +
     (x.it.price != null ? '<i>' + fmtPrice(x.it.price) + '</i>' : '') +
     '</span></button>').join('');
@@ -1003,7 +1032,7 @@ function renderMenu() {
           const extra = sizeCount(item, c.kind);
           return `
           <button type="button" class="card" data-kind="${c.kind}" data-cat="${c.key}" data-id="${item.id}" data-tags="${(item.tags || []).join(',')}">
-            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${imgURL(PHOTOS.dishes[item.id], 128)}" srcset="${imgSet(PHOTOS.dishes[item.id], [128, 256])}" sizes="58px" width="128" height="128" alt="${dishAlt(item)}" loading="lazy" decoding="async">` : inkArt(item, c.kind)}</span>
+            <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${imgURL(PHOTOS.dishes[item.id], 128)}"${photoAttrs(PHOTOS.dishes[item.id])} srcset="${imgSet(PHOTOS.dishes[item.id], [128, 256])}" sizes="58px" width="128" height="128" alt="${dishAlt(item)}" loading="lazy" decoding="async">` : inkArt(item, c.kind)}</span>
             <span class="card-mid">
               <span class="card-name">${item.name[lang]}</span>
               <span class="card-desc">${item.desc[lang] || ''}</span>
@@ -1061,7 +1090,8 @@ function openSheet(item, kind, fromURL) {
   const photo = PHOTOS.dishes[item.id];
   const pf = $('#sheetPhoto');
   if (photo) { const spi = $('#sheetPhotoImg');
-    spi.src = imgURL(photo, 828); spi.srcset = imgSet(photo, [414, 640, 828]);
+    spi.src = imgURL(photo, 828); spi.dataset.photo = photo; spi.style.objectPosition = posFor(photo);
+    spi.srcset = imgSet(photo, [414, 640, 828]);
     spi.sizes = '(min-width: 1020px) 420px, 92vw'; spi.width = 820; spi.height = 615;
     $('#sheetPhotoImg').alt = dishAlt(item); pf.hidden = false; $('#sheetArt').hidden = true; }
   else { pf.hidden = true; $('#sheetArt').hidden = false; }

@@ -726,6 +726,7 @@ const INFO = {
   doordash: 'https://www.doordash.com/store/bakery-le-four-montreal-26133532/',
   instagram: 'https://www.instagram.com/lefourboulangerie/',
   facebook: 'https://www.facebook.com/boulangerielefour/',
+  tiktok: 'https://www.tiktok.com/@lefourboulangerie',
   /* collez ici votre Stripe Payment Link (Dashboard → Payment Links)
      pour activer le bouton « Payer en ligne » : */
   stripe: '',
