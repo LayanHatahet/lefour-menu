@@ -136,10 +136,13 @@
   }, true);
 
   /* ── boot: pull editable settings, then start everything ─ */
-  fetch('/api/settings', { cache: 'no-store' })
+  /* main.js starts this request while the page is still being read (the photos
+     wait for it, for their framing): reuse it instead of asking twice */
+  (window.LF_SETTINGS_P || fetch('/api/settings', { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
-    .then(j => {
-      const s = (j && j.settings) || {};
+    .then(j => (j && j.settings) || {}))
+    .then(s => {
+      s = s || {};
       window.LF_SETTINGS = s;
       loadGTM(s.gtm || '');
       loadGA4(s.ga4 || '');

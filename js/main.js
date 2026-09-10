@@ -249,6 +249,8 @@ async function loadPhotos(attempt = 0) {
     const r = await fetch('/api/photos');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
+    /* le cadrage doit etre connu avant l'affichage (voir LF_SETTINGS_P) */
+    await settingsSoon(1200);
     PHOTOS_READY = true;
     PHOTOS = { dishes: j.dishes || {}, gallery: j.gallery || [], hero: j.hero || '' };
     renderMenu();
@@ -686,6 +688,20 @@ function applyPositions() {
   });
 }
 document.addEventListener('lf-settings', applyPositions);
+
+/* Les reglages (cadrage, textes alt, identifiants de suivi) sont demandes une
+   seule fois, des maintenant, et partages avec analytics.js. Les photos
+   attendent leur cadrage avant de s'afficher : sans cela une photo recadree
+   glisserait en place une fois chargee. */
+window.LF_SETTINGS_P = window.LF_SETTINGS_P || fetch('/api/settings', { cache: 'no-store' })
+  .then(r => (r.ok ? r.json() : null))
+  .then(j => { const s = (j && j.settings) || {}; window.LF_SETTINGS = s; return s; })
+  .catch(() => ({}));
+/* attente bornee : un demarrage a froid de l'API ne retient jamais les photos */
+function settingsSoon(ms) {
+  if (window.LF_SETTINGS) return Promise.resolve();
+  return Promise.race([window.LF_SETTINGS_P, new Promise(r => setTimeout(r, ms))]);
+}
 
 /* ══════════ PANIER ══════════════════════════════════════
    Le client veut pouvoir ajouter un plat dès qu'il voit sa photo.
