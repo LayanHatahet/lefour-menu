@@ -426,7 +426,7 @@ function openPosEditor(url, kind, name) {
   if (!url || !SETTINGS) return;
   const start = posOf(url);
   const [x, y] = start.split(' ').map(parseFloat);
-  PE = { url, x, y, start, drag: false };
+  PE = { url, x, y, start, drag: false, wasDirty: DIRTY };
   $('#peTitle').textContent = name ? name + ' \u2014 position' : 'Photo position';
   const frames = (PE_FRAMES[kind] || PE_FRAMES.dish).slice();
   if (kind === 'dish' && !DATA.hero && heroFallback() === url) frames.push(PE_HERO_FALLBACK);
@@ -466,12 +466,19 @@ function closePosEditor(keep) {
     if (PE.start === '50% 50%') delete SETTINGS.pos[PE.url]; else SETTINGS.pos[PE.url] = PE.start;
     applyAdminPositions();
   }
-  const changed = keep && posOf(PE.url) !== PE.start;
+  const changed = posOf(PE.url) !== PE.start;
+  /* no net change and nothing else was pending: leave the dashboard as clean
+     as it was - no stale save bar, no "leave this page?" prompt */
+  if (!changed && !PE.wasDirty) {
+    DIRTY = false;
+    const bar = $('#saveBar');
+    if (bar) bar.hidden = true;
+  }
   PE = null;
   $('#posEditor').hidden = true;
   document.body.classList.remove('pe-open');
   $('#peImg').removeAttribute('src');
-  if (changed) toast('Position set \u2014 click Save changes to publish');
+  if (changed && keep) toast('Position set \u2014 click Save changes to publish');
 }
 
 (function bindPosEditor() {
