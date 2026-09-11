@@ -725,13 +725,31 @@ function itemOf(id) {
   return null;
 }
 
-function cartAdd(item, kind, price, sizeLabel) {
-  const key = item.id + '|' + (sizeLabel || '');
+/* formats commandables d'un plat, dans l'ordre du menu : code stable + prix */
+function sizeOptions(item, kind) {
+  if (kind === 'mini') return item.price != null ? [{ k: '12', p: item.price }] : [];
+  const o = [];
+  if (item.price != null) o.push({ k: 'R', p: item.price });
+  if (item.large != null) o.push({ k: 'L', p: item.large });
+  if (item.box != null) o.push({ k: 'B', p: item.box });
+  return o;
+}
+function sizeLabel(k) {
+  return k === 'R' ? t('sizeR') : k === 'L' ? t('sizeL') : k === 'B' ? t('sizeB')
+    : k === '12' ? '12 \u00b7 ' + t('per12') : '';
+}
+/* Le panier garde le CODE du format, pas son libelle : le panier et le message
+   WhatsApp suivent ainsi la langue affichee. Les paniers d'avant gardent le
+   libelle deja ecrit. */
+function lineSize(l) { return l.sizeKey ? sizeLabel(l.sizeKey) : (l.size || ''); }
+
+function cartAdd(item, kind, price, sizeKey) {
+  const key = item.id + '|' + (sizeKey || '');
   const line = CART.find(l => l.key === key);
   if (line) line.qty++;
   else CART.push({ key, id: item.id, kind, qty: 1,
-                   price: price == null ? null : price, size: sizeLabel || '' });
-  track('add_to_cart', { item: item.id, size: sizeLabel || 'default' });
+                   price: price == null ? null : price, sizeKey: sizeKey || '' });
+  track('add_to_cart', { item: item.id, size: sizeKey || 'default' });
   cartSave();
 }
 
@@ -753,7 +771,7 @@ function cartRender() {
     return '<div class="cline" data-key="' + l.key + '">' +
       '<span class="cline-art">' + art + '</span>' +
       '<span class="cline-mid"><b>' + name + '</b>' +
-      (l.size ? '<small>' + l.size + '</small>' : '') +
+      (lineSize(l) ? '<small>' + lineSize(l) + '</small>' : '') +
       (l.price != null ? '<em>' + fmtPrice(l.price) + '</em>' : '') +
       '</span>' +
       '<span class="cline-qty">' +
@@ -789,15 +807,43 @@ function bindSheetAdd() {
   if (!b) return;
   b.addEventListener('click', () => {
     if (!SHEET_ITEM) return;
-    const price = SHEET_ITEM.price != null ? SHEET_ITEM.price : null;
-    const label = SHEET_KIND === 'mini' ? '12' : (SHEET_ITEM.price != null ? t('sizeR') : '');
-    cartAdd(SHEET_ITEM, SHEET_KIND, price, label);
+    /* le format coche dans la fiche (Regulier, Sandwich, Boite de 6...) */
+    const opts = sizeOptions(SHEET_ITEM, SHEET_KIND);
+    const o = opts.find(x => x.k === SHEET_SIZE) || opts[0] || null;
+    const code = o && (opts.length > 1 || SHEET_KIND === 'mini') ? o.k : '';
+    cartAdd(SHEET_ITEM, SHEET_KIND, o ? o.p : null, code);
     const span = b.querySelector('span');
+    const choice = $('#sheetAddChoice');
     const prev = span.textContent;
     span.textContent = t('added');
+    if (choice) choice.hidden = true;
     b.classList.add('is-done');
-    setTimeout(() => { span.textContent = prev; b.classList.remove('is-done'); }, 1100);
+    setTimeout(() => { span.textContent = prev; if (choice) choice.hidden = false; b.classList.remove('is-done'); }, 1100);
   });
+  /* choix du format : clic, ou fleches du clavier (dans le sens de lecture) */
+  const box = $('#sheetPrices');
+  if (box && !box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('click', (e) => {
+      const r = e.target.closest('.is-pick');
+      if (!r) return;
+      SHEET_SIZE = r.dataset.size;
+      paintSizeChoice();
+    });
+    box.addEventListener('keydown', (e) => {
+      const rows = $$('#sheetPrices .is-pick');
+      if (!rows.length) return;
+      const rtl = document.documentElement.dir === 'rtl';
+      const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      const i = rows.findIndex(r => r.dataset.size === SHEET_SIZE);
+      const next = rows[(i + step + rows.length) % rows.length];
+      SHEET_SIZE = next.dataset.size;
+      paintSizeChoice();
+      next.focus();
+    });
+  }
 }
 
 function bindCart() {
@@ -822,7 +868,8 @@ function bindCart() {
     const lines = CART.map(l => {
       const it = itemOf(l.id);
       const nm = it ? it.name[lang] : l.id;
-      return '• ' + nm + (l.size ? ' (' + l.size + ')' : '') + ' × ' + l.qty;
+      const sz = lineSize(l);
+      return '• ' + nm + (sz ? ' (' + sz + ')' : '') + ' × ' + l.qty;
     }).join(NL);
     const note = ($('#cartNote').value || '').trim();
     const tot = cartTotal();
@@ -1098,7 +1145,21 @@ const sheet = $('#sheet');
 const sheetCard = $('#sheetCard');
 let lastFocus = null;
 
-let SHEET_ITEM = null, SHEET_KIND = null;
+let SHEET_ITEM = null, SHEET_KIND = null, SHEET_SIZE = null;
+/* reflete le format coche sur les lignes et sur le bouton « Ajouter » */
+function paintSizeChoice() {
+  const opts = SHEET_ITEM ? sizeOptions(SHEET_ITEM, SHEET_KIND) : [];
+  $$('#sheetPrices .is-pick').forEach(r => {
+    const on = r.dataset.size === SHEET_SIZE;
+    r.classList.toggle('is-on', on);
+    r.setAttribute('aria-checked', String(on));
+    r.tabIndex = on ? 0 : -1;
+  });
+  const c = $('#sheetAddChoice');
+  if (!c) return;
+  const o = opts.find(x => x.k === SHEET_SIZE);
+  c.textContent = opts.length > 1 && o ? '\u00b7 ' + sizeLabel(o.k) + ' \u00b7 ' + fmtPrice(o.p) : '';
+}
 function openSheet(item, kind, fromURL) {
   SHEET_ITEM = item; SHEET_KIND = kind;
   lastFocus = document.activeElement;
@@ -1117,16 +1178,21 @@ function openSheet(item, kind, fromURL) {
   const tagsEl = $('#sheetTags');
   tagsEl.textContent = (item.tags || []).map(tg => t(tg)).join(' · ');
   tagsEl.style.display = (item.tags && item.tags.length) ? '' : 'none';
-  const rows = [];
-  if (kind === 'mini') rows.push([`12 · ${t('per12')}`, item.price]);
-  else {
-    if (item.price != null) rows.push([t('sizeR'), item.price]);
-    if (item.large != null) rows.push([t('sizeL'), item.large]);
-    if (item.box != null) rows.push([t('sizeB'), item.box]);
-  }
-  $('#sheetPrices').innerHTML = rows.map(([l, p]) =>
-    `<div class="price-row"><span>${l}</span><i class="pr-leader" aria-hidden="true"></i><b>${fmtPrice(p)}</b></div>`).join('');
-  $('#sheetPrices').style.display = rows.length ? '' : 'none';
+  /* Plusieurs formats : chaque ligne devient un choix et « Ajouter » ajoute celui
+     qui est coche. Avant, le bouton ajoutait toujours le format regulier : le
+     Sandwich et la Boite de 6 ne pouvaient pas etre commandes. */
+  const opts = sizeOptions(item, kind);
+  const pick = opts.length > 1;
+  SHEET_SIZE = opts.length ? opts[0].k : null;
+  const box = $('#sheetPrices');
+  box.innerHTML = (pick ? `<p class="size-hint" id="sizeHint">${t('chooseSize')}</p>` : '') +
+    opts.map((o, i) => pick
+      ? `<button type="button" class="price-row is-pick${i === 0 ? ' is-on' : ''}" role="radio" aria-checked="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-size="${o.k}"><i class="pr-dot" aria-hidden="true"></i><span>${sizeLabel(o.k)}</span><i class="pr-leader" aria-hidden="true"></i><b>${fmtPrice(o.p)}</b></button>`
+      : `<div class="price-row"><span>${sizeLabel(o.k)}</span><i class="pr-leader" aria-hidden="true"></i><b>${fmtPrice(o.p)}</b></div>`).join('');
+  if (pick) { box.setAttribute('role', 'radiogroup'); box.setAttribute('aria-labelledby', 'sizeHint'); }
+  else { box.removeAttribute('role'); box.removeAttribute('aria-labelledby'); }
+  box.style.display = opts.length ? '' : 'none';
+  paintSizeChoice();
   sheet.classList.add('is-open');
   sheet.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
