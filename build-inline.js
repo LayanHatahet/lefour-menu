@@ -43,7 +43,7 @@ ${code}
 /* index.html is written further down, once the Menu structured data exists. */
 
 /* ── 2. per-language documents ────────────────────────────── */
-const SITE = 'https://lefour.vercel.app';
+const SITE = 'https://lefourboulangerie.com';
 
 const META = {
   en: {

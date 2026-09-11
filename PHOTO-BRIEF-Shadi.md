@@ -1,7 +1,7 @@
 # Le Four — brief photo pour Shadi
 **Séance : mardi & mercredi · à la boulangerie, 15708 boul. de Pierrefonds**
 
-Le site est déjà en ligne (lefour.vercel.app) et attend ces photos.
+Le site est déjà en ligne (lefourboulangerie.com) et attend ces photos.
 Chaque photo se téléverse directement dans le tableau de bord — aucun développeur requis.
 
 ---
@@ -66,7 +66,7 @@ qawarma, duplex, choco-banane, makdous, sharhat.
 - Le blanc doit rester blanc : éviter la lumière jaune des néons
 
 ## Pour les mettre en ligne
-1. Ouvrir **lefour.vercel.app/admin**
+1. Ouvrir **lefourboulangerie.com/admin**
 2. Mot de passe : `lefour2026`
 3. Onglet **Photos** → *Home page photo* / *Restaurant gallery* / *Dish photos*
 4. La photo apparaît sur le site en moins d'une minute
