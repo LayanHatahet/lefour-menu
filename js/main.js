@@ -818,7 +818,18 @@ function bindSheetAdd() {
     span.textContent = t('added');
     if (choice) choice.hidden = true;
     b.classList.add('is-done');
-    setTimeout(() => { span.textContent = prev; if (choice) choice.hidden = false; b.classList.remove('is-done'); }, 1100);
+    /* Le client veut revenir a la liste du menu apres un ajout, pas rester sur
+       la fiche : on laisse voir « Ajoute », puis la fiche se referme d'elle-meme
+       (closeSheet remet aussi l'adresse et la position dans le menu).
+       Le jeton evite de refermer une fiche ouverte entre-temps. */
+    const token = ++ADD_TOKEN;
+    setTimeout(() => {
+      if (token !== ADD_TOKEN) return;
+      span.textContent = prev;
+      if (choice) choice.hidden = false;
+      b.classList.remove('is-done');
+      closeSheet();
+    }, 800);
   });
   /* choix du format : clic, ou fleches du clavier (dans le sens de lecture) */
   const box = $('#sheetPrices');
@@ -1145,7 +1156,7 @@ const sheet = $('#sheet');
 const sheetCard = $('#sheetCard');
 let lastFocus = null;
 
-let SHEET_ITEM = null, SHEET_KIND = null, SHEET_SIZE = null;
+let SHEET_ITEM = null, SHEET_KIND = null, SHEET_SIZE = null, ADD_TOKEN = 0;
 /* reflete le format coche sur les lignes et sur le bouton « Ajouter » */
 function paintSizeChoice() {
   const opts = SHEET_ITEM ? sizeOptions(SHEET_ITEM, SHEET_KIND) : [];
