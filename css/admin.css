@@ -155,3 +155,7 @@ border:3px solid #fff;background:rgba(110,122,53,.35);box-shadow:0 0 0 1.5px rgb
   #dishList .ract,#heroRow .ract{margin-inline-start:66px}
   .pe{padding:8px}.pe-card{padding:14px 14px 16px}.pe-head{flex-wrap:wrap}
 }
+
+/* storage paused by Vercel: nothing can be uploaded or saved over the real data */
+body.is-paused .ract label,body.is-paused .ract button,body.is-paused .drop,
+body.is-paused .gal button,body.is-paused #saveBar{pointer-events:none;opacity:.4}

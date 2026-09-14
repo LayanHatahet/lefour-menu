@@ -55,12 +55,26 @@ async function api(path, opts = {}) {
     headers: { 'content-type': 'application/json', 'x-admin-key': KEY, ...(opts.headers || {}) },
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  if (!r.ok) {
+    if (j.blocked) storagePaused();
+    throw new Error(j.error || `HTTP ${r.status}`);
+  }
   return j;
 }
 
+/* Vercel has paused the photo storage (free-plan monthly limit). Say so in
+   plain words, and grey out uploads and saving until it is back. */
+function storagePaused() {
+  const note = $('#notice');
+  if (note) {
+    note.hidden = false;
+    note.innerHTML = "<b>Photo storage is paused.</b> Vercel's free plan reached its monthly limit, so photos and saved settings cannot be shown or changed right now. <b>Nothing has been deleted.</b> Please don't upload or save until this message is gone.";
+  }
+  document.body.classList.add('is-paused');
+}
+
 async function load() {
-  DATA = await api('/api/photos?t=' + Date.now());
+  DATA = await api('/api/photos?fresh=' + Date.now());
   const note = $('#notice');
   if (DATA.configured === false) {
     note.hidden = false;
@@ -68,6 +82,7 @@ async function load() {
   } else {
     note.hidden = true;
   }
+  document.body.classList.remove('is-paused');
   renderHero();
   renderGallery();
   renderDishes();
@@ -338,7 +353,7 @@ function validateHours() {
 }
 
 async function loadSettings() {
-  const j = await api('/api/settings');
+  const j = await api('/api/settings?fresh=' + Date.now());
   SETTINGS = j.settings || {};
   if (!SETTINGS.pos || typeof SETTINGS.pos !== 'object') SETTINGS.pos = {};
   fillSettingsForm();
@@ -347,6 +362,9 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  /* settings that could not be read must never be saved: that would replace
+     everything the owner saved before with empty fields */
+  if (!SETTINGS) { toast('Settings could not be loaded, so nothing was saved'); return; }
   /* checked before the button is touched, so the guard survives the finally */
   if (!validateHours()) { toast('Fix the opening hours first'); return; }
   const btn = $('#saveBtn');
