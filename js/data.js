@@ -736,7 +736,7 @@ const INFO = {
 };
 
 /* Horaires machine (heure de Montreal) — confirmes par le client :
-   dim 6 h 30 a 15 h · lun ferme · mar-jeu et sam 6 h 30 a 17 h · ven 6 h 30 a 15 h.
+   dim 6 h 30 a 15 h · lun ferme · mar a sam 6 h 30 a 17 h (vendredi corrige le 2026-09-17).
    Index: 0=dim … 6=sam. [ouverture, fermeture] en minutes depuis minuit. */
 const SCHEDULE = {
   0: [390, 900],
@@ -744,6 +744,6 @@ const SCHEDULE = {
   2: [390, 1020],
   3: [390, 1020],
   4: [390, 1020],
-  5: [390, 900],
+  5: [390, 1020],
   6: [390, 1020],
 };
