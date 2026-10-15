@@ -1123,7 +1123,9 @@ function applyMenuOverrides() {
       for (const k of MENU_PRICE_KEYS) {
         const v = ov[k];
         const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
-        it[k] = (typeof n === 'number' && isFinite(n) && n >= 0) ? n : base[k];
+        /* 0 n est pas un prix : le proprietaire qui tape 0 veut retirer la
+           taille, pas la vendre gratuitement — on retombe sur le menu livre. */
+        it[k] = (typeof n === 'number' && isFinite(n) && n > 0) ? n : base[k];
       }
       for (const k of ['name', 'desc']) {
         const sub = ov[k] && typeof ov[k] === 'object' ? ov[k] : null;

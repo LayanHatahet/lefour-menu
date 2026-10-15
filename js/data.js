@@ -371,6 +371,17 @@ const MENU = {
       },
     },
     {
+      id: 'kashkaval', price: null, tags: ['veg'],
+      art: { shape: 'round', style: 'melt', ink: '#46522A', accent: '#E7C979' },
+      seo: { slug: 'kashkaval-manakish', alt: 'Kashkaval cheese manakish with melted Kashkaval cheese', kw: 'kashkaval manakish Montreal' },
+      name: { fr: 'Manouché Kashkaval', en: 'Kashkaval', ar: 'قشقوان' },
+      desc: {
+        fr: 'Notre pâte fraîche du matin, garnie de kashkaval qui fond doucement. Simple et réconfortant.',
+        en: 'Golden-baked pastry filled with melted Kashkaval cheese.',
+        ar: 'عجينة ذهبية محشوّة بجبنة القشقوان الذائبة — بسيطة ولذيذة.',
+      },
+    },
+    {
       id: 'sujuk', price: 9, large: 14, tags: ['spicy'],
       art: { shape: 'round', style: 'discs', ink: '#6A2D34', accent: '#B96A4A' },
       seo: { slug: 'sujuk-manakish', alt: 'Sujuk manakish with aged sujuk, Eastern cheese, red sauce and caramelized onions', kw: 'sujuk manakish Montreal' },
@@ -379,6 +390,28 @@ const MENU = {
         fr: 'Saucisse sujuk bien relevée, fromages fondants, sauce maison et oignons caramélisés. Ça réveille.',
         en: 'Oven-baked manakish topped with aged sujuk, melted Eastern cheese, house red sauce and caramelized onions.',
         ar: 'منقوشة طازجة بسجق معتّق فاخر وأجبان شرقية ذائبة وصلصة حمراء منزلية غنية وبصل مكرمل.',
+      },
+    },
+    {
+      id: 'basturma', price: null, tags: [],
+      art: { shape: 'round', style: 'discs', ink: '#6A2D34', accent: '#B96A4A' },
+      seo: { slug: 'basturma-manakish', alt: 'Basturma manakish with thinly sliced spiced cured beef and melted Eastern cheese', kw: 'basturma manakish Montreal' },
+      name: { fr: 'Manouché Bastourma', en: 'Basturma', ar: 'بسطرما' },
+      desc: {
+        fr: 'Bœuf séché aux épices, tranché mince, avec nos fromages fondants par-dessus. Bien relevé.',
+        en: 'Oven-baked manakish topped with thinly sliced air-dried basturma and melted Eastern cheese.',
+        ar: 'منقوشة طازجة بشرائح البسطرما المجفّفة بالتوابل مع أجبان شرقية ذائبة — نكهة قويّة وأصيلة.',
+      },
+    },
+    {
+      id: 'turkey', price: null, tags: [],
+      art: { shape: 'round', style: 'spread-melt', ink: '#6A2D34', accent: '#E7C979' },
+      seo: { slug: 'turkey-cheese-manakish', alt: 'Turkey and cheese manakish with smoked turkey, barbecue sauce and herbs', kw: 'turkey cheese manakish Montreal' },
+      name: { fr: 'Manouché Dinde', en: 'Turkey', ar: 'دنده' },
+      desc: {
+        fr: 'Dinde fumée, fromage fondant, sauce barbecue et fines herbes.',
+        en: 'Smoked turkey and cheese manakish with barbecue sauce and herbs.',
+        ar: 'منقوشة بشرائح الدنده المدخّنة مع الجبنة الذائبة وصلصة الباربكيو والأعشاب.',
       },
     },
     {
@@ -437,7 +470,7 @@ const MENU = {
       },
     },
     {
-      id: 'boat', price: 4, large: 14, box: 20, tags: ['veg'],
+      id: 'boat', price: 4, box: 20, tags: ['veg'],
       art: { shape: 'boat', style: 'boat', ink: '#E7C979', accent: '#6E7A35' },
       seo: { slug: 'syrian-cheese-manakish', alt: 'Syrian cheese manakish with Akkawi cheese, eggs, parsley and clarified butter', kw: 'Syrian cheese manakish Montreal' },
       name: { fr: 'Barque au Fromage Syrien', en: 'Syrian Cheese Boat', ar: 'قارب الجبنة السورية' },

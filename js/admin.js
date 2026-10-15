@@ -280,6 +280,9 @@ const MENU_SIZE_FIELDS = [
 ];
 const MENU_LANGS = [['fr', 'French'], ['en', 'English'], ['ar', 'Arabic']];
 const PRICE_RE = /^\d{1,4}([.,]\d{1,2})?$/;
+/* 0 is not a price. Someone typing 0 means "we do not sell this size", which
+   is what an empty box already says, so 0 is refused rather than published. */
+const priceBad = (typed) => typed !== '' && (!PRICE_RE.test(typed) || Number(typed.replace(',', '.')) <= 0);
 
 function esc(v) {
   return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -345,8 +348,10 @@ function refreshMenuRow(id) {
 function menuRowHtml(it) {
   const ov = menuOv(it.id);
   const photo = DATA.dishes[it.id];
+  /* every size box is always shown, even when the site ships no price for it:
+     that is how a brand-new dish, or the drinks, get their first price without
+     a code change. A box left empty means the size is simply not offered. */
   const prices = MENU_SIZE_FIELDS
-    .filter(([k]) => it[k] != null || ov[k] != null)
     .map(([k, label]) =>
       '<label class="mprice"><span>' + label + '</span>' +
       '<input class="mp" inputmode="decimal" data-menu-price="' + it.id + '" data-key="' + k + '"' +
@@ -373,7 +378,7 @@ function menuRowHtml(it) {
     '<span class="msum" data-msum="' + it.id + '"></span>' +
     '<span class="mflag" data-mchanged="' + it.id + '"></span></summary>' +
     '<div class="mbody">' +
-      '<div class="mprices">' + (prices || '<p class="muted">This item has no price on the site.</p>') + '</div>' +
+      '<div class="mprices">' + prices + '</div>' +
       '<div class="grid2">' + texts + '</div>' +
       '<div class="mfoot"><button type="button" class="mreset" data-mreset="' + it.id + '">Reset this dish</button>' +
       '<span class="muted">Empty box = the original text or price shown in grey.</span></div>' +
@@ -392,7 +397,7 @@ function renderMenuEditor() {
   $$('#menuList [data-menu-price]').forEach(el => el.addEventListener('input', () => {
     const id = el.dataset.menuPrice, key = el.dataset.key;
     const typed = el.value.trim();
-    const bad = typed !== '' && !PRICE_RE.test(typed);
+    const bad = priceBad(typed);
     el.classList.toggle('err', bad);
     markDirty();
     if (bad) return;
@@ -434,7 +439,7 @@ function validateMenu() {
   let ok = true;
   $$('#menuList [data-menu-price]').forEach(el => {
     const typed = el.value.trim();
-    const bad = typed !== '' && !PRICE_RE.test(typed);
+    const bad = priceBad(typed);
     el.classList.toggle('err', bad);
     if (bad) ok = false;
   });
