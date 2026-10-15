@@ -159,3 +159,43 @@ border:3px solid #fff;background:rgba(110,122,53,.35);box-shadow:0 0 0 1.5px rgb
 /* storage paused by Vercel: nothing can be uploaded or saved over the real data */
 body.is-paused .ract label,body.is-paused .ract button,body.is-paused .drop,
 body.is-paused .gal button,body.is-paused #saveBar{pointer-events:none;opacity:.4}
+
+/* ── menu & prices ─────────────────────────────────────── */
+.mcat { margin: 0 0 22px; }
+.mcat h3 {
+  font: 600 .72rem/1 var(--sans, inherit); letter-spacing: .14em;
+  text-transform: uppercase; opacity: .55; margin: 0 0 8px;
+}
+.mitem { border: 1px solid var(--hair, #e0d9cc); border-radius: 12px; margin-bottom: 8px; background: #fff; }
+.mitem[open] { box-shadow: 0 1px 10px rgba(0, 0, 0, .05); }
+.mitem.is-edited { border-color: #6E7A35; }
+.mitem > summary {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; cursor: pointer; list-style: none;
+}
+.mitem > summary::-webkit-details-marker { display: none; }
+.mitem .thumb img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; display: block; }
+.mnopic { display: block; width: 38px; height: 38px; border-radius: 50%; background: #efe8db; }
+.mitem .rname { flex: 1; min-width: 0; }
+.msum { font-size: .82rem; opacity: .7; white-space: nowrap; }
+.mflag:not(:empty) {
+  font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: #fff; background: #6E7A35; padding: 3px 8px; border-radius: 99px;
+}
+.mbody { padding: 4px 14px 14px; border-top: 1px solid var(--hair, #e0d9cc); }
+.mprices { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 14px; }
+.mprice { display: grid; gap: 4px; }
+.mprice > span { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
+.mprice input { width: 110px; }
+.mp.err { border-color: #B4493F; background: #fdf3f2; }
+.mfoot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.mreset {
+  font: inherit; font-size: .78rem; cursor: pointer;
+  border: 1px solid var(--hair, #e0d9cc); background: #fff;
+  padding: 7px 14px; border-radius: 99px;
+}
+.mreset:hover { border-color: #6E7A35; color: #46522A; }
+@media (max-width: 640px) {
+  .msum { display: none; }
+  .mprice input { width: 92px; }
+}

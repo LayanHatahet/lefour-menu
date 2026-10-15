@@ -34,10 +34,19 @@
 
     <nav class="tabs" id="adminTabs">
       <button class="atab is-on" data-tab="photos">Photos</button>
+      <button class="atab" data-tab="menu">Menu &amp; prices</button>
       <button class="atab" data-tab="seo">SEO</button>
       <button class="atab" data-tab="analytics">Analytics</button>
       <button class="atab" data-tab="business">Business &amp; social</button>
     </nav>
+
+    <div class="pane" id="pane-menu" hidden>
+      <section class="block">
+        <h2>Menu &amp; prices</h2>
+        <p class="muted">Change a price or the wording of any dish. Leave a box empty to keep what the site ships with &mdash; the grey text in each empty box is that original value. Dishes cannot be added or removed here.</p>
+        <div id="menuList"></div>
+      </section>
+    </div>
 
     <div class="pane" id="pane-seo" hidden>
       <section class="block">

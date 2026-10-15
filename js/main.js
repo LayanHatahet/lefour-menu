@@ -419,6 +419,7 @@ function applyI18n() {
   $$('.lang-switch button').forEach(b => b.classList.toggle('is-active', b.dataset.setlang === lang));
   ensureArabicFonts();
   applySeo();
+  applyMenuOverrides();
   injectMenuSchema();
   buildTabs();
   buildFilters();
@@ -478,7 +479,11 @@ function wireInfo() {
     if (addr) { const a = $('#cAddr'); if (a) a.textContent = addr; }
     if (st.email) { const m = $('#cMail'); if (m) { m.href = 'mailto:' + st.email; m.textContent = st.email; } }
     applySeo();
+    applyMenuOverrides();
+    injectMenuSchema();
     renderMenu();
+    renderFeatured();
+    renderPicker();
     renderHours();
     renderStatus();
   });
@@ -1082,6 +1087,53 @@ function applyFilter() {
     const any = $$('.card:not(.is-hidden)', cat).length > 0;
     cat.style.display = any ? '' : 'none';
   });
+}
+
+/* ── menu modifiable depuis le tableau de bord ───────────────
+   Le proprietaire change les prix et les textes dans /admin ; seules les
+   valeurs reellement modifiees sont enregistrees. On garde donc une copie
+   du menu livre avec le site : c est elle qui revient quand un champ est
+   vide ou quand on utilise « Reset » dans le tableau de bord. */
+const MENU_BASE = (() => {
+  const out = {};
+  for (const key of Object.keys(MENU)) {
+    for (const it of MENU[key]) {
+      out[it.id] = {
+        price: it.price, large: it.large, box: it.box,
+        name: Object.assign({}, it.name),
+        desc: Object.assign({}, it.desc),
+      };
+    }
+  }
+  return out;
+})();
+
+const MENU_PRICE_KEYS = ['price', 'large', 'box'];
+
+/* applique (ou retire) les surcharges sur MENU lui-meme : tout ce qui lit le
+   menu ensuite — cartes, fiche, panier, donnees structurees — suit sans
+   changement. Idempotent : on repart toujours de MENU_BASE. */
+function applyMenuOverrides() {
+  const all = (window.LF_SETTINGS && window.LF_SETTINGS.menu) || {};
+  for (const key of Object.keys(MENU)) {
+    for (const it of MENU[key]) {
+      const base = MENU_BASE[it.id];
+      if (!base) continue;
+      const ov = (all && typeof all === 'object' && all[it.id]) || {};
+      for (const k of MENU_PRICE_KEYS) {
+        const v = ov[k];
+        const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+        it[k] = (typeof n === 'number' && isFinite(n) && n >= 0) ? n : base[k];
+      }
+      for (const k of ['name', 'desc']) {
+        const sub = ov[k] && typeof ov[k] === 'object' ? ov[k] : null;
+        for (const lg of ['fr', 'en', 'ar']) {
+          const v = sub && sub[lg];
+          it[k][lg] = (typeof v === 'string' && v.trim()) ? v.trim() : base[k][lg];
+        }
+      }
+    }
+  }
 }
 
 /* ───────────────────── menu render ─────────────────────── */

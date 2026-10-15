@@ -267,6 +267,180 @@ function renderAlts() {
   applyAdminPositions();
 }
 
+/* ── menu & prices ───────────────────────────────────────
+   The menu itself lives in data.js and ships with the site. Here the owner
+   only overrides it: an empty box means "use what the site ships with", so
+   SETTINGS.menu stays small and a dish can always be put back. Dishes are
+   never added or removed from the dashboard — the site's artwork, slugs and
+   structured data are keyed to the ids in data.js. */
+const MENU_SIZE_FIELDS = [
+  ['price', 'Regular'],
+  ['large', 'Sandwich'],
+  ['box', 'Box of 6'],
+];
+const MENU_LANGS = [['fr', 'French'], ['en', 'English'], ['ar', 'Arabic']];
+const PRICE_RE = /^\d{1,4}([.,]\d{1,2})?$/;
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function menuBaseOf(id) {
+  for (const c of CATS) {
+    const hit = (MENU[c.key] || []).find(it => it.id === id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/* the override bag for one dish, created only when something is typed */
+function menuOv(id, create) {
+  if (!SETTINGS.menu || typeof SETTINGS.menu !== 'object') SETTINGS.menu = {};
+  if (!SETTINGS.menu[id] && create) SETTINGS.menu[id] = {};
+  return SETTINGS.menu[id] || {};
+}
+
+/* an override that no longer holds anything is removed, so "emptied every
+   box" is stored as "nothing changed" instead of as a pile of empty strings */
+function pruneMenuOv(id) {
+  const o = SETTINGS.menu && SETTINGS.menu[id];
+  if (!o) return;
+  for (const k of ['name', 'desc']) {
+    if (o[k] && !Object.keys(o[k]).length) delete o[k];
+  }
+  if (!Object.keys(o).length) delete SETTINGS.menu[id];
+}
+
+function priceBoxValue(id, key) {
+  const o = menuOv(id);
+  return o[key] == null ? '' : String(o[key]);
+}
+
+/* the summary line shows the price the site will actually display */
+function menuSummary(it) {
+  const ov = menuOv(it.id);
+  const parts = MENU_SIZE_FIELDS
+    .filter(([k]) => it[k] != null || ov[k] != null)
+    .map(([k, label]) => label + ' ' + (ov[k] != null ? ov[k] : it[k]) + ' $');
+  return parts.join(' · ') || '—';
+}
+
+function menuChangedLabel(id) {
+  const o = SETTINGS.menu && SETTINGS.menu[id];
+  return o && Object.keys(o).length ? 'Edited' : '';
+}
+
+function refreshMenuRow(id) {
+  const it = menuBaseOf(id);
+  if (!it) return;
+  const sum = $('[data-msum="' + id + '"]');
+  if (sum) sum.textContent = menuSummary(it);
+  const ch = $('[data-mchanged="' + id + '"]');
+  if (ch) ch.textContent = menuChangedLabel(id);
+  const row = $('[data-mitem="' + id + '"]');
+  if (row) row.classList.toggle('is-edited', !!menuChangedLabel(id));
+}
+
+function menuRowHtml(it) {
+  const ov = menuOv(it.id);
+  const photo = DATA.dishes[it.id];
+  const prices = MENU_SIZE_FIELDS
+    .filter(([k]) => it[k] != null || ov[k] != null)
+    .map(([k, label]) =>
+      '<label class="mprice"><span>' + label + '</span>' +
+      '<input class="mp" inputmode="decimal" data-menu-price="' + it.id + '" data-key="' + k + '"' +
+      ' placeholder="' + (it[k] == null ? '—' : it[k]) + '"' +
+      ' value="' + esc(priceBoxValue(it.id, k)) + '"></label>').join('');
+
+  const texts = MENU_LANGS.map(([lg, label]) =>
+    '<label class="fld"><span>Name — ' + label + '</span>' +
+    '<input data-menu-text="' + it.id + '" data-key="name" data-lang="' + lg + '" maxlength="80"' +
+    (lg === 'ar' ? ' dir="rtl"' : '') +
+    ' placeholder="' + esc(it.name[lg] || '') + '"' +
+    ' value="' + esc((ov.name && ov.name[lg]) || '') + '"></label>' +
+    '<label class="fld"><span>Description — ' + label + '</span>' +
+    '<textarea data-menu-text="' + it.id + '" data-key="desc" data-lang="' + lg + '" rows="2" maxlength="600"' +
+    (lg === 'ar' ? ' dir="rtl"' : '') +
+    ' placeholder="' + esc(it.desc[lg] || '') + '">' +
+    esc((ov.desc && ov.desc[lg]) || '') + '</textarea></label>').join('');
+
+  return '<details class="mitem" data-mitem="' + it.id + '">' +
+    '<summary><span class="thumb">' +
+      (photo ? '<img src="' + photo + '" alt="" loading="lazy" data-photo="' + photo + '">' : '<i class="mnopic"></i>') +
+    '</span>' +
+    '<span class="rname">' + esc(it.name.en) + '<small>' + it.id + '</small></span>' +
+    '<span class="msum" data-msum="' + it.id + '"></span>' +
+    '<span class="mflag" data-mchanged="' + it.id + '"></span></summary>' +
+    '<div class="mbody">' +
+      '<div class="mprices">' + (prices || '<p class="muted">This item has no price on the site.</p>') + '</div>' +
+      '<div class="grid2">' + texts + '</div>' +
+      '<div class="mfoot"><button type="button" class="mreset" data-mreset="' + it.id + '">Reset this dish</button>' +
+      '<span class="muted">Empty box = the original text or price shown in grey.</span></div>' +
+    '</div></details>';
+}
+
+function renderMenuEditor() {
+  const host = $('#menuList');
+  if (!host || !SETTINGS) return;
+  host.innerHTML = CATS.map(c => {
+    const items = MENU[c.key] || [];
+    if (!items.length) return '';
+    return '<div class="mcat"><h3>' + c.label + '</h3>' + items.map(menuRowHtml).join('') + '</div>';
+  }).join('');
+
+  $$('#menuList [data-menu-price]').forEach(el => el.addEventListener('input', () => {
+    const id = el.dataset.menuPrice, key = el.dataset.key;
+    const typed = el.value.trim();
+    const bad = typed !== '' && !PRICE_RE.test(typed);
+    el.classList.toggle('err', bad);
+    markDirty();
+    if (bad) return;
+    if (typed === '') delete menuOv(id, true)[key];
+    else menuOv(id, true)[key] = Number(typed.replace(',', '.'));
+    pruneMenuOv(id);
+    refreshMenuRow(id);
+  }));
+
+  $$('#menuList [data-menu-text]').forEach(el => el.addEventListener('input', () => {
+    const id = el.dataset.menuText, key = el.dataset.key, lg = el.dataset.lang;
+    const bag = menuOv(id, true);
+    if (!bag[key] || typeof bag[key] !== 'object') bag[key] = {};
+    if (el.value.trim()) bag[key][lg] = el.value;
+    else delete bag[key][lg];
+    pruneMenuOv(id);
+    refreshMenuRow(id);
+    markDirty();
+  }));
+
+  $$('#menuList [data-mreset]').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.mreset;
+    if (SETTINGS.menu) delete SETTINGS.menu[id];
+    const was = $('[data-mitem="' + id + '"]');
+    const open = !!(was && was.open);
+    renderMenuEditor();
+    const now = $('[data-mitem="' + id + '"]');
+    if (now && open) now.open = true;
+    markDirty();
+    toast('Reset — click Save changes to publish it');
+  }));
+
+  CATS.forEach(c => (MENU[c.key] || []).forEach(it => refreshMenuRow(it.id)));
+  applyAdminPositions();
+}
+
+/* a bad price must never reach the site: same rule as the API */
+function validateMenu() {
+  let ok = true;
+  $$('#menuList [data-menu-price]').forEach(el => {
+    const typed = el.value.trim();
+    const bad = typed !== '' && !PRICE_RE.test(typed);
+    el.classList.toggle('err', bad);
+    if (bad) ok = false;
+  });
+  return ok;
+}
+
 /* ── opening hours ───────────────────────────────────────
    Stored as one string per weekday, "HH:MM-HH:MM", or "" for closed.
    Key 0 is Sunday, matching SCHEDULE in data.js and JavaScript's getDay(). */
@@ -359,6 +533,7 @@ async function loadSettings() {
   fillSettingsForm();
   renderAlts();
   renderHoursEditor();
+  renderMenuEditor();
 }
 
 async function saveSettings() {
@@ -367,6 +542,7 @@ async function saveSettings() {
   if (!SETTINGS) { toast('Settings could not be loaded, so nothing was saved'); return; }
   /* checked before the button is touched, so the guard survives the finally */
   if (!validateHours()) { toast('Fix the opening hours first'); return; }
+  if (!validateMenu()) { toast('Fix the highlighted prices first'); return; }
   const btn = $('#saveBtn');
   btn.disabled = true;
   $('#saveHint').textContent = 'Saving…';
@@ -388,6 +564,7 @@ function bindTabs() {
     $$('.atab').forEach(x => x.classList.toggle('is-on', x === b));
     $$('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + b.dataset.tab; });
     if (b.dataset.tab === 'seo') renderAlts();
+    if (b.dataset.tab === 'menu') renderMenuEditor();
   }));
   const sb = $('#saveBtn');
   if (sb) sb.addEventListener('click', saveSettings);
