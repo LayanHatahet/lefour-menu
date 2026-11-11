@@ -750,8 +750,11 @@ const MENU = {
 
 /* ── coordonnées & liens officiels (source unique) ───────── */
 const INFO = {
-  phoneDisplay: '(514) 746-5966',
-  phoneRaw: '15147465966',
+  phoneDisplay: '(514) 624-3330',
+  phoneRaw: '15146243330',
+  /* WhatsApp est une ligne differente du telephone du commerce (client,
+     2026-11-11) : tous les liens wa.me partent d ici, les liens tel: de
+     phoneRaw. Ne pas les realigner. */
   whatsapp: '15147465966',
   email: 'info@lefourboulangerie.com',
   address: '15708 Boul. de Pierrefonds, Pierrefonds, QC H9H 3P6',
