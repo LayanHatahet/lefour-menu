@@ -352,6 +352,12 @@
             <textarea id="cartNote" rows="2"></textarea></label>
           <p class="cart-total"><span data-i18n="cartTotal">Total</span><b id="cartTotal">—</b></p>
           <p class="cart-hint" data-i18n="cartHint">On confirme tout par WhatsApp avant de préparer.</p>
+          <!-- paiement en ligne : masque tant que STRIPE_SECRET_KEY n est pas
+               configure sur Vercel, pour ne jamais montrer un bouton mort -->
+          <button class="btn-block btn-pay" id="cartPay" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.5 10h19" stroke="currentColor" stroke-width="1.8"/><path d="M6 14.5h3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span data-i18n="payOnline">Payer en ligne</span>
+          </button>
           <button class="btn-block" id="cartSend">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.65 15L2 22l5.15-1.35A10 10 0 1 0 12 2zm0 1.8a8.2 8.2 0 1 1-4.19 15.25l-.3-.18-3.12.82.83-3.04-.19-.31A8.2 8.2 0 0 1 12 3.8z" fill="currentColor"/></svg>
             <span data-i18n="cartSend">Envoyer la commande</span>

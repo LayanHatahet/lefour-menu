@@ -211,3 +211,29 @@ fs.mkdirSync(`${out}/fr`, { recursive: true });
 fs.writeFileSync(`${out}/fr/index.html`,
   frDoc.replace(/(src|href)="(assets\/|js\/|css\/)/g, (m, a, p) => `${a}="/${p}`));
 console.log('wrote /fr/index.html');
+
+/* ── 3. prix lisibles par le serveur ───────────────────────
+   api/checkout.js doit refaire le total lui-meme : un panier arrive du
+   navigateur et ne prouve rien. Ce fichier est genere a partir du MENU
+   reellement deploye, donc il ne peut pas diverger du site. Les prix
+   modifies depuis le tableau de bord sont appliques par-dessus, a la
+   lecture, exactement comme le fait le site.                              */
+const MENU_FOR_PRICES = DATA.MENU || null;
+if (!MENU_FOR_PRICES) {
+  console.error('MENU unavailable — menu-prices.json not written, online payment will refuse every cart');
+} else {
+  const items = {};
+  for (const cat of Object.keys(MENU_FOR_PRICES)) {
+    for (const it of MENU_FOR_PRICES[cat]) {
+      items[it.id] = {
+        cat,
+        price: it.price == null ? null : it.price,
+        large: it.large == null ? null : it.large,
+        box: it.box == null ? null : it.box,
+        name: { fr: it.name.fr, en: it.name.en, ar: it.name.ar },
+      };
+    }
+  }
+  fs.writeFileSync(`${out}/menu-prices.json`, JSON.stringify({ currency: 'cad', items }));
+  console.log(`wrote /menu-prices.json  (${Object.keys(items).length} dishes)`);
+}

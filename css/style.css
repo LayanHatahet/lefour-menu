@@ -1044,3 +1044,11 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 .price-row.is-on .pr-dot::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--herbs); }
 .price-row.is-on span { opacity: 1; color: var(--herbs); }
 .add-choice[hidden] { display: none; }
+
+/* ── paiement en ligne ─────────────────────────────────── */
+.btn-pay {
+  background: var(--herbs); color: var(--ivory);
+  border: 1px solid var(--herbs);
+}
+.btn-pay[disabled] { opacity: .6; pointer-events: none; }
+@media (hover: hover) { .btn-pay:hover { background: var(--olive); border-color: var(--olive); } }

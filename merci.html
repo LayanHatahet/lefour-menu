@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Merci — Boulangerie Le Four</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" href="/assets/logo_rollpin.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,340..600;1,9..144,340..500&family=Manrope:wght@400;600;800&display=optional">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* page autonome : la feuille du site donne les couleurs et les polices,
+       la mise en page tient en quelques lignes */
+    body { background: var(--herbs); display: grid; place-items: center; min-height: 100svh; padding: 28px 18px; }
+    .done {
+      background: var(--ivory); color: var(--ink);
+      max-width: 520px; width: 100%; border-radius: 26px;
+      padding: 38px 26px 30px; text-align: center;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .28);
+    }
+    .done-pin { width: 118px; height: auto; opacity: .85; margin-bottom: 18px; }
+    .done h1 { font-family: var(--serif); font-weight: 500; font-size: 1.9rem; line-height: 1.15; margin-bottom: 12px; }
+    .done p { font-size: .96rem; line-height: 1.55; opacity: .8; margin-bottom: 10px; }
+    .done .ref { font-size: .72rem; letter-spacing: .08em; opacity: .5; margin-top: 16px; word-break: break-all; }
+    .done-btns { display: grid; gap: 10px; margin-top: 24px; }
+    .done-btns a {
+      display: block; padding: 14px 18px; border-radius: 99px; text-decoration: none;
+      font-weight: 700; font-size: .78rem; letter-spacing: .14em; text-transform: uppercase;
+    }
+    .b-main { background: var(--herbs); color: var(--ivory); }
+    .b-quiet { border: 1px solid var(--hair); color: var(--ink); }
+    [dir="rtl"] .done-btns a { letter-spacing: .02em; font-size: .9rem; text-transform: none; }
+  </style>
+</head>
+<body>
+  <main class="done">
+    <img class="done-pin" src="/assets/logo_rollpin.png" alt="" width="420" height="55">
+    <h1 id="h"></h1>
+    <p id="p1"></p>
+    <p id="p2"></p>
+    <div class="done-btns">
+      <a class="b-main" id="back" href="/"></a>
+      <a class="b-quiet" id="wa" href="#" target="_blank" rel="noopener"></a>
+    </div>
+    <p class="ref" id="ref"></p>
+  </main>
+
+  <script>
+    /* Stripe nous renvoie ici avec ?lang= : on affiche la langue du client */
+    var T = {
+      fr: { t: 'Merci, c’est payé !', a: 'Votre commande est payée et nous est arrivée.',
+            b: 'On vous confirme l’heure de ramassage par WhatsApp. La commande se récupère à la boulangerie.',
+            back: 'Retour au menu', wa: 'Nous écrire sur WhatsApp', ref: 'Référence : ', dir: 'ltr', title: 'Merci — Boulangerie Le Four' },
+      en: { t: 'Thank you — payment received', a: 'Your order is paid and has reached us.',
+            b: 'We will confirm your pickup time on WhatsApp. Orders are collected at the bakery.',
+            back: 'Back to the menu', wa: 'Message us on WhatsApp', ref: 'Reference: ', dir: 'ltr', title: 'Thank you — Boulangerie Le Four' },
+      ar: { t: 'شكراً، تم الدفع!', a: 'طلبك مدفوع ووصلنا.',
+            b: 'منأكدلك وقت الاستلام عبر واتساب. الطلب بينستلم من المخبز.',
+            back: 'رجوع للمنيو', wa: 'راسلنا على واتساب', ref: 'الرقم المرجعي: ', dir: 'rtl', title: 'شكراً — مخبز لو فور' },
+    };
+    var q = new URLSearchParams(location.search);
+    var lang = ['fr', 'en', 'ar'].indexOf(q.get('lang')) > -1 ? q.get('lang') : 'fr';
+    var c = T[lang];
+    document.documentElement.lang = lang;
+    document.documentElement.dir = c.dir;
+    document.title = c.title;
+    document.getElementById('h').textContent = c.t;
+    document.getElementById('p1').textContent = c.a;
+    document.getElementById('p2').textContent = c.b;
+    var back = document.getElementById('back');
+    back.textContent = c.back;
+    back.href = lang === 'fr' ? '/' : '/' + lang;
+    var wa = document.getElementById('wa');
+    wa.textContent = c.wa;
+    wa.href = 'https://wa.me/15147465966';
+    var sid = q.get('session_id');
+    if (sid) document.getElementById('ref').textContent = c.ref + sid.slice(-12);
+    /* le panier est paye : on le vide pour ne pas le repayer */
+    try { localStorage.removeItem('lefour-cart'); } catch (e) {}
+  </script>
+</body>
+</html>

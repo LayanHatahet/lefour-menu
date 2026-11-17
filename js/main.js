@@ -880,6 +880,47 @@ function bindCart() {
   window.openCart = open;
   $$('#cart [data-cclose]').forEach(el => el.addEventListener('click', close));
   $('#cartClear').addEventListener('click', () => { CART = []; cartSave(); });
+
+  /* ── paiement en ligne (Stripe Checkout) ────────────────
+     On n envoie que des identifiants, des tailles et des quantites :
+     api/checkout.js refait le total a partir du menu deploye et des prix
+     du tableau de bord. Aucune donnee de carte ne passe par ce site, le
+     navigateur est redirige vers la page hebergee par Stripe. */
+  const payBtn = $('#cartPay');
+  if (payBtn) {
+    /* le bouton reste cache tant que la cle Stripe n est pas en place */
+    fetch('/api/checkout').then(r => r.ok ? r.json() : null).then(j => {
+      if (j && j.configured) payBtn.hidden = false;
+    }).catch(() => {});
+
+    payBtn.addEventListener('click', async () => {
+      if (!CART.length) return;
+      const label = payBtn.querySelector('span');
+      const original = label.textContent;
+      payBtn.disabled = true;
+      label.textContent = t('paying');
+      track('checkout_start', { items: cartCount(), value: cartTotal() });
+      try {
+        const r = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            lang: lang,
+            note: ($('#cartNote').value || '').trim(),
+            items: CART.map(l => ({ id: l.id, size: l.sizeKey || 'R', qty: l.qty })),
+          }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.url) throw new Error(j.error || 'no session');
+        location.assign(j.url);
+        return;
+      } catch (e) {
+        alert(t('payFail'));
+        payBtn.disabled = false;
+        label.textContent = original;
+      }
+    });
+  }
   $('#cartSend').addEventListener('click', () => {
     const lines = CART.map(l => {
       const it = itemOf(l.id);
