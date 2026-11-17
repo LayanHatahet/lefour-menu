@@ -1,4 +1,4 @@
-/* GET  /api/checkout  -> { configured: true|false }   (is online payment on?)
+/* GET  /api/checkout  -> { configured: true|false, mode: 'test'|'live' }
    POST /api/checkout  -> { url }  a Stripe Checkout session to redirect to
 
    Stripe Checkout is Stripe's own hosted page: no card detail ever reaches
@@ -93,7 +93,15 @@ module.exports = async (req, res) => {
        On ne renvoie que ce que le client vient lui-meme de saisir et de payer,
        et seulement si Stripe confirme le paiement. */
     const sid = (req.query && req.query.session_id) || '';
-    if (!sid) return res.status(200).json({ configured: !!stripeKey() });
+    if (!sid) {
+      /* le prefixe de la cle dit le mode. On ne renvoie que le mot :
+         aucune partie de la cle ne sort d ici. */
+      const k = stripeKey();
+      return res.status(200).json({
+        configured: !!k,
+        mode: k ? (k.indexOf('sk_live') === 0 ? 'live' : 'test') : null,
+      });
+    }
     if (!stripeKey()) return res.status(503).json({ error: 'STRIPE_SECRET_KEY not set' });
     if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(sid)) return res.status(400).json({ error: 'bad session id' });
     try {
