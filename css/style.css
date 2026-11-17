@@ -1052,3 +1052,11 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 }
 .btn-pay[disabled] { opacity: .6; pointer-events: none; }
 @media (hover: hover) { .btn-pay:hover { background: var(--olive); border-color: var(--olive); } }
+
+/* l option « payer en ligne » dans la feuille Commander */
+.order-grid--solo { grid-template-columns: 1fr; }
+.obtn--pay { background: var(--herbs); border-color: var(--herbs); color: var(--ivory); }
+.obtn--pay .obtn-ic { color: var(--herbs); }   /* pastille ivoire : l icone doit etre sombre */
+@media (hover: hover) { .obtn--pay:hover { background: var(--olive); border-color: var(--olive); } }
+.opay-hint { font-size: .78rem; opacity: .62; margin: 8px 2px 2px; line-height: 1.45; }
+#osPayTotal { font-style: normal; font-weight: 700; }

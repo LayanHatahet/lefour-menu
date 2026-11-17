@@ -376,6 +376,20 @@
       <div class="sheet-scroll">
         <h3 class="sheet-name" data-i18n="orderHow">Comment voulez-vous commander ?</h3>
         <div class="ochoice">
+          <!-- payer en ligne : premiere option, mais masquee tant que Stripe
+               n est pas configure (voir #cartPay dans main.js) -->
+          <div id="osPayGroup" hidden>
+            <p class="og-label"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M2.5 10h19" stroke="currentColor" stroke-width="1.7"/><path d="M6 14.5h3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span data-i18n="payOnline">Payer en ligne</span></p>
+            <div class="order-grid order-grid--solo">
+              <button type="button" class="obtn obtn--pay" id="osPay" data-track="pay_sheet_click">
+                <span class="obtn-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.5 10h19" stroke="currentColor" stroke-width="1.8"/><path d="M6 14.5h3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+                <b id="osPayLabel" data-i18n="payCard">Payer par carte</b>
+                <i class="obtn-arrow" id="osPayTotal" aria-hidden="true">→</i>
+              </button>
+            </div>
+            <p class="opay-hint" id="osPayHint" data-i18n="payPickFirst">Choisissez vos articles, puis payez par carte.</p>
+          </div>
+
           <p class="og-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v8H3zM14 10h4l3 3v2h-7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="17.5" cy="17.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.7"/></svg><span data-i18n="delivery">Livraison</span></p>
           <div class="order-grid">
             <a class="obtn" id="osUber" target="_blank" rel="noopener" data-track="uber_eats_click"><span class="obtn-ic"><svg viewBox="0 0 24 24"><path d="M6 8h12l-1.2 11a2 2 0 0 1-2 1.8H9.2a2 2 0 0 1-2-1.8L6 8z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 8V7a3 3 0 0 1 6 0v1" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span><b>Uber Eats</b><i class="obtn-arrow">↗</i></a>

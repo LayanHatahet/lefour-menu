@@ -759,6 +759,7 @@ function cartAdd(item, kind, price, sizeKey) {
 }
 
 function cartRender() {
+  refreshPayEntry();
   const n = cartCount();
   const badge = $('#sbCount');
   if (badge) { badge.textContent = String(n); badge.hidden = n === 0; }
@@ -862,6 +863,11 @@ function bindSheetAdd() {
   }
 }
 
+/* rempli par bindCart(), utilise par la feuille « Commander » */
+let OPEN_CART = null;
+/* passe a true quand /api/checkout confirme que Stripe est configure */
+let PAY_READY = false;
+
 function bindCart() {
   const cart = $('#cart');
   if (!cart) return;
@@ -879,6 +885,9 @@ function bindCart() {
   };
   window.openCart = open;
   $$('#cart [data-cclose]').forEach(el => el.addEventListener('click', close));
+  /* la feuille « Commander » doit pouvoir ouvrir le panier */
+  OPEN_CART = open;
+
   $('#cartClear').addEventListener('click', () => { CART = []; cartSave(); });
 
   /* ── paiement en ligne (Stripe Checkout) ────────────────
@@ -890,7 +899,12 @@ function bindCart() {
   if (payBtn) {
     /* le bouton reste cache tant que la cle Stripe n est pas en place */
     fetch('/api/checkout').then(r => r.ok ? r.json() : null).then(j => {
-      if (j && j.configured) payBtn.hidden = false;
+      if (!j || !j.configured) return;
+      PAY_READY = true;
+      payBtn.hidden = false;
+      const grp = $('#osPayGroup');
+      if (grp) grp.hidden = false;
+      refreshPayEntry();
     }).catch(() => {});
 
     payBtn.addEventListener('click', async () => {
@@ -1056,6 +1070,24 @@ function bindContact() {
 }
 
 /* ── feuille « Commander en ligne » ─────────────────────── */
+/* Le bouton de la feuille « Commander » change selon le panier : vide, il
+   renvoie choisir des articles ; plein, il affiche le total et ouvre le
+   panier pour relire la commande avant de payer. */
+function refreshPayEntry() {
+  if (!PAY_READY) return;
+  const label = $('#osPayLabel'), total = $('#osPayTotal'), hint = $('#osPayHint');
+  if (!label) return;
+  if (cartCount() > 0) {
+    label.textContent = t('payReview');
+    if (total) total.textContent = fmtPrice(cartTotal());
+    if (hint) hint.hidden = true;
+  } else {
+    label.textContent = t('payCard');
+    if (total) total.textContent = String.fromCharCode(8594);
+    if (hint) { hint.hidden = false; hint.textContent = t('payPickFirst'); }
+  }
+}
+
 function bindOrderSheet() {
   const os = $('#osheet');
   const openBtn = $('#orderOpen');
@@ -1063,6 +1095,15 @@ function bindOrderSheet() {
   const close = () => { os.classList.remove('is-open'); os.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; };
   openBtn && openBtn.addEventListener('click', () => { track('order_online'); open(); });
   $$('#osheet [data-oclose]').forEach(el => el.addEventListener('click', close));
+
+  const osPay = $('#osPay');
+  if (osPay) osPay.addEventListener('click', () => {
+    close();
+    if (cartCount() > 0 && OPEN_CART) { OPEN_CART(); return; }
+    /* panier vide : on emmene au menu plutot que d ouvrir un panier vide */
+    const menu = $('#menu');
+    if (menu) menu.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 }
 
