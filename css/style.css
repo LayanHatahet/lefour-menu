@@ -960,8 +960,10 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 [dir="rtl"] .cart-total { letter-spacing: .02em; font-size: .84rem; }
 .cart-total b { font-family: var(--serif); font-size: 1.4rem; color: var(--herbs); letter-spacing: 0; }
 .cart-hint { font-size: .74rem; opacity: .55; text-align: center; }
-#cartSend { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 0; }
-#cartSend svg { width: 18px; height: 18px; flex: none; }
+#cartSend, #cartPay { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 0; }
+/* sans taille explicite, un SVG inline retombe sur 300x150 : l icone de carte
+   remplissait tout le bouton sur mobile */
+#cartSend svg, #cartPay svg { width: 18px; height: 18px; flex: none; }
 .link-btn {
   font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
   opacity: .55; padding: 10px; width: 100%;
@@ -1049,6 +1051,7 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 .btn-pay {
   background: var(--herbs); color: var(--ivory);
   border: 1px solid var(--herbs);
+  margin-top: 12px;
 }
 .btn-pay[disabled] { opacity: .6; pointer-events: none; }
 @media (hover: hover) { .btn-pay:hover { background: var(--olive); border-color: var(--olive); } }
