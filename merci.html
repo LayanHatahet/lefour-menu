@@ -41,8 +41,8 @@
     <p id="p1"></p>
     <p id="p2"></p>
     <div class="done-btns">
-      <a class="b-main" id="back" href="/"></a>
-      <a class="b-quiet" id="wa" href="#" target="_blank" rel="noopener"></a>
+      <a class="b-main" id="wa" href="#" target="_blank" rel="noopener"></a>
+      <a class="b-quiet" id="back" href="/"></a>
     </div>
     <p class="ref" id="ref"></p>
   </main>
@@ -50,15 +50,24 @@
   <script>
     /* Stripe nous renvoie ici avec ?lang= : on affiche la langue du client */
     var T = {
-      fr: { t: 'Merci, c’est payé !', a: 'Votre commande est payée et nous est arrivée.',
-            b: 'On vous confirme l’heure de ramassage par WhatsApp. La commande se récupère à la boulangerie.',
-            back: 'Retour au menu', wa: 'Nous écrire sur WhatsApp', ref: 'Référence : ', dir: 'ltr', title: 'Merci — Boulangerie Le Four' },
-      en: { t: 'Thank you — payment received', a: 'Your order is paid and has reached us.',
-            b: 'We will confirm your pickup time on WhatsApp. Orders are collected at the bakery.',
-            back: 'Back to the menu', wa: 'Message us on WhatsApp', ref: 'Reference: ', dir: 'ltr', title: 'Thank you — Boulangerie Le Four' },
-      ar: { t: 'شكراً، تم الدفع!', a: 'طلبك مدفوع ووصلنا.',
-            b: 'منأكدلك وقت الاستلام عبر واتساب. الطلب بينستلم من المخبز.',
-            back: 'رجوع للمنيو', wa: 'راسلنا على واتساب', ref: 'الرقم المرجعي: ', dir: 'rtl', title: 'شكراً — مخبز لو فور' },
+      fr: { t: 'Merci, c’est payé !', a: 'Votre paiement est accepté.',
+            b: 'Dernière étape : envoyez-nous la commande sur WhatsApp pour qu’on la prépare et qu’on vous donne l’heure de ramassage.',
+            back: 'Retour au menu', wa: 'Envoyer ma commande sur WhatsApp', waPlain: 'Nous écrire sur WhatsApp',
+            ref: 'Référence : ', dir: 'ltr', title: 'Merci — Boulangerie Le Four',
+            msgHead: 'Bonjour ! Je viens de payer ma commande en ligne.',
+            msgOrder: 'Commande', msgNote: 'Note', msgPaid: 'Payé', msgRef: 'Référence', msgName: 'Nom', msgPhone: 'Téléphone' },
+      en: { t: 'Thank you — payment received', a: 'Your payment went through.',
+            b: 'One last step: send us the order on WhatsApp so we can prepare it and give you a pickup time.',
+            back: 'Back to the menu', wa: 'Send my order on WhatsApp', waPlain: 'Message us on WhatsApp',
+            ref: 'Reference: ', dir: 'ltr', title: 'Thank you — Boulangerie Le Four',
+            msgHead: 'Hi! I have just paid for my order online.',
+            msgOrder: 'Order', msgNote: 'Note', msgPaid: 'Paid', msgRef: 'Reference', msgName: 'Name', msgPhone: 'Phone' },
+      ar: { t: 'شكراً، تم الدفع!', a: 'تم قبول الدفع.',
+            b: 'خطوة أخيرة: ابعتلنا الطلب على واتساب لنحضّره ونعطيك وقت الاستلام.',
+            back: 'رجوع للمنيو', wa: 'ابعت طلبي على واتساب', waPlain: 'راسلنا على واتساب',
+            ref: 'الرقم المرجعي: ', dir: 'rtl', title: 'شكراً — مخبز لو فور',
+            msgHead: 'مرحبا! هلق دفعت طلبي أونلاين.',
+            msgOrder: 'الطلب', msgNote: 'ملاحظة', msgPaid: 'المدفوع', msgRef: 'الرقم المرجعي', msgName: 'الاسم', msgPhone: 'الهاتف' },
     };
     var q = new URLSearchParams(location.search);
     var lang = ['fr', 'en', 'ar'].indexOf(q.get('lang')) > -1 ? q.get('lang') : 'fr';
@@ -72,11 +81,36 @@
     var back = document.getElementById('back');
     back.textContent = c.back;
     back.href = lang === 'fr' ? '/' : '/' + lang;
+    /* le numero WhatsApp de la boulangerie, le meme que partout sur le site */
+    var WA_NUMBER = '15147465966';
     var wa = document.getElementById('wa');
-    wa.textContent = c.wa;
-    wa.href = 'https://wa.me/15147465966';
+    wa.textContent = c.waPlain;
+    wa.href = 'https://wa.me/' + WA_NUMBER;
+
     var sid = q.get('session_id');
     if (sid) document.getElementById('ref').textContent = c.ref + sid.slice(-12);
+
+    /* On demande a Stripe ce qui a reellement ete paye, puis on prepare le
+       message. Rien n est pris dans l URL : seul un paiement confirme donne
+       un recapitulatif. Si l appel echoue, le bouton reste un simple lien
+       WhatsApp — le client peut toujours nous joindre. */
+    if (sid) {
+      fetch('/api/checkout?session_id=' + encodeURIComponent(sid))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.paid) return;
+          var L = [c.msgHead, ''];
+          if (d.order) L.push(c.msgOrder + ' : ' + d.order);
+          if (d.note) L.push(c.msgNote + ' : ' + d.note);
+          if (d.amount != null) L.push(c.msgPaid + ' : ' + d.amount.toFixed(2) + ' ' + d.currency);
+          if (d.name) L.push(c.msgName + ' : ' + d.name);
+          if (d.phone) L.push(c.msgPhone + ' : ' + d.phone);
+          L.push(c.msgRef + ' : ' + d.ref);
+          wa.textContent = c.wa;
+          wa.href = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(L.join(String.fromCharCode(10)));
+        })
+        .catch(function () {});
+    }
     /* le panier est paye : on le vide pour ne pas le repayer */
     try { localStorage.removeItem('lefour-cart'); } catch (e) {}
   </script>

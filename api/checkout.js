@@ -88,7 +88,37 @@ module.exports = async (req, res) => {
   res.setHeader('cache-control', 'no-store');
 
   if (req.method === 'GET') {
-    return res.status(200).json({ configured: !!stripeKey() });
+    /* ?session_id=... -> le recapitulatif de la commande payee, pour que la
+       page /merci puisse proposer de l envoyer a la boulangerie sur WhatsApp.
+       On ne renvoie que ce que le client vient lui-meme de saisir et de payer,
+       et seulement si Stripe confirme le paiement. */
+    const sid = (req.query && req.query.session_id) || '';
+    if (!sid) return res.status(200).json({ configured: !!stripeKey() });
+    if (!stripeKey()) return res.status(503).json({ error: 'STRIPE_SECRET_KEY not set' });
+    if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(sid)) return res.status(400).json({ error: 'bad session id' });
+    try {
+      const r = await fetch(`${STRIPE_API}/${encodeURIComponent(sid)}`, {
+        headers: { authorization: `Bearer ${stripeKey()}` },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return res.status(404).json({ error: 'session not found' });
+      if (j.payment_status !== 'paid') return res.status(200).json({ paid: false });
+      const d = j.customer_details || {};
+      return res.status(200).json({
+        paid: true,
+        amount: typeof j.amount_total === 'number' ? j.amount_total / 100 : null,
+        currency: (j.currency || 'cad').toUpperCase(),
+        order: (j.metadata && j.metadata.order) || '',
+        note: (j.metadata && j.metadata.note) || '',
+        lang: (j.metadata && j.metadata.lang) || 'fr',
+        name: d.name || '',
+        phone: d.phone || '',
+        ref: String(sid).slice(-12),
+      });
+    } catch (e) {
+      console.error('session lookup failed:', e && e.message);
+      return res.status(500).json({ error: 'lookup failed' });
+    }
   }
   if (req.method !== 'POST') {
     res.setHeader('allow', 'GET, POST');
