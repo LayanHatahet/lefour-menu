@@ -194,6 +194,11 @@ module.exports = async (req, res) => {
          Pricing) : un client a l etranger voyait son total en livres
          turques, avec les frais de conversion qui vont avec. */
       adaptive_pricing: { enabled: false },
+      /* Sans cette liste, Stripe affiche tout ce qui est active dans le
+         compte, Klarna comprise : un paiement en plusieurs fois n a aucun
+         sens pour un manouche a 4 $. « card » couvre aussi Apple Pay et
+         Google Pay, qui restent proposes. */
+      payment_method_types: ['card'],
       metadata: {
         order: summary.join(', ').slice(0, 450),
         note: note,
