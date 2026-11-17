@@ -189,6 +189,11 @@ module.exports = async (req, res) => {
           }[lang],
         },
       },
+      /* Tout se ramasse a Pierrefonds et se regle en dollars canadiens.
+         Sans ceci, Stripe propose la devise locale du visiteur (Adaptive
+         Pricing) : un client a l etranger voyait son total en livres
+         turques, avec les frais de conversion qui vont avec. */
+      adaptive_pricing: { enabled: false },
       metadata: {
         order: summary.join(', ').slice(0, 450),
         note: note,
@@ -198,15 +203,29 @@ module.exports = async (req, res) => {
       line_items: line_items,
     };
 
-    const r = await fetch(STRIPE_API, {
+    const post = (body) => fetch(STRIPE_API, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${stripeKey()}`,
         'content-type': 'application/x-www-form-urlencoded',
       },
-      body: formEncode(payload).join('&'),
+      body: formEncode(body).join('&'),
     });
-    const j = await r.json().catch(() => ({}));
+
+    let r = await post(payload);
+    let j = await r.json().catch(() => ({}));
+
+    /* adaptive_pricing n est pas accepte par tous les comptes. S il est
+       refuse, on reessaie sans : mieux vaut un paiement avec conversion
+       qu un paiement impossible. */
+    if (!r.ok && j.error && /adaptive_pricing/.test(JSON.stringify(j.error))) {
+      console.warn('adaptive_pricing refused by this account — retrying without it');
+      const fallback = Object.assign({}, payload);
+      delete fallback.adaptive_pricing;
+      r = await post(fallback);
+      j = await r.json().catch(() => ({}));
+    }
+
     if (!r.ok || !j.url) {
       /* Stripe's own message is the useful one, but the key must never leak */
       const msg = (j.error && j.error.message) || `stripe ${r.status}`;
