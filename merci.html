@@ -24,6 +24,8 @@
     .done h1 { font-family: var(--serif); font-weight: 500; font-size: 1.9rem; line-height: 1.15; margin-bottom: 12px; }
     .done p { font-size: .96rem; line-height: 1.55; opacity: .8; margin-bottom: 10px; }
     .done .ref { font-size: .72rem; letter-spacing: .08em; opacity: .5; margin-top: 16px; word-break: break-all; }
+    /* l historique se remplit tout seul : cette ligne ne fait que le dire */
+    .done .acct { font-size: .8rem; line-height: 1.5; opacity: .62; margin-top: 20px; }
     .done-btns { display: grid; gap: 10px; margin-top: 24px; }
     .done-btns a {
       display: block; padding: 14px 18px; border-radius: 99px; text-decoration: none;
@@ -44,6 +46,7 @@
       <a class="b-main" id="wa" href="#" target="_blank" rel="noopener"></a>
       <a class="b-quiet" id="back" href="/"></a>
     </div>
+    <p class="acct" id="acct"></p>
     <p class="ref" id="ref"></p>
   </main>
 
@@ -53,18 +56,21 @@
       fr: { t: 'Merci, c’est payé !', a: 'Votre paiement est accepté.',
             b: 'Dernière étape : envoyez-nous la commande sur WhatsApp pour qu’on la prépare et qu’on vous donne l’heure de ramassage.',
             back: 'Retour au menu', wa: 'Envoyer ma commande sur WhatsApp', waPlain: 'Nous écrire sur WhatsApp',
+            acct: 'Créez un compte avec ce courriel et cette commande vous attendra, prête à être refaite.',
             ref: 'Référence : ', dir: 'ltr', title: 'Merci — Boulangerie Le Four',
             msgHead: 'Bonjour ! Je viens de payer ma commande en ligne.',
             msgOrder: 'Commande', msgNote: 'Note', msgPaid: 'Payé', msgRef: 'Référence', msgName: 'Nom', msgPhone: 'Téléphone' },
       en: { t: 'Thank you — payment received', a: 'Your payment went through.',
             b: 'One last step: send us the order on WhatsApp so we can prepare it and give you a pickup time.',
             back: 'Back to the menu', wa: 'Send my order on WhatsApp', waPlain: 'Message us on WhatsApp',
+            acct: 'Create an account with this email and this order will be waiting, ready to repeat.',
             ref: 'Reference: ', dir: 'ltr', title: 'Thank you — Boulangerie Le Four',
             msgHead: 'Hi! I have just paid for my order online.',
             msgOrder: 'Order', msgNote: 'Note', msgPaid: 'Paid', msgRef: 'Reference', msgName: 'Name', msgPhone: 'Phone' },
       ar: { t: 'شكراً، تم الدفع!', a: 'تم قبول الدفع.',
             b: 'خطوة أخيرة: ابعتلنا الطلب على واتساب لنحضّره ونعطيك وقت الاستلام.',
             back: 'رجوع للمنيو', wa: 'ابعت طلبي على واتساب', waPlain: 'راسلنا على واتساب',
+            acct: 'اعمل حساب بنفس الإيميل ويضل هالطلب مستنيك، جاهز تعيدو.',
             ref: 'الرقم المرجعي: ', dir: 'rtl', title: 'شكراً — مخبز لو فور',
             msgHead: 'مرحبا! هلق دفعت طلبي أونلاين.',
             msgOrder: 'الطلب', msgNote: 'ملاحظة', msgPaid: 'المدفوع', msgRef: 'الرقم المرجعي', msgName: 'الاسم', msgPhone: 'الهاتف' },
@@ -86,6 +92,8 @@
     var wa = document.getElementById('wa');
     wa.textContent = c.waPlain;
     wa.href = 'https://wa.me/' + WA_NUMBER;
+
+    document.getElementById('acct').textContent = c.acct;
 
     var sid = q.get('session_id');
     if (sid) document.getElementById('ref').textContent = c.ref + sid.slice(-12);

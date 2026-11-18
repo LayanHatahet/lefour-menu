@@ -731,6 +731,49 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 }
 
 /* ── feuille « Commander en ligne » ────────────── */
+/* ── compte client (facultatif) ─────────────────────────────────────
+   Meme feuille coulissante que le panier et « Commander » : la page en
+   a deja deux, une troisieme mecanique de fenetre serait une de trop. */
+#acsheet { position: fixed; inset: 0; z-index: 915; visibility: hidden; }
+#acsheet.is-open { visibility: visible; }
+#acsheet .sheet-veil { opacity: 0; transition: opacity .35s; }
+#acsheet.is-open .sheet-veil { opacity: 1; }
+.acsheet-card { max-height: 88svh; transform: translateY(105%); }
+#acsheet.is-open .acsheet-card { transform: translateY(0); }
+.acsheet-card .sheet-scroll { justify-items: stretch; text-align: start; }
+.acsheet-card .sheet-name { text-align: center; }
+.ac-intro { font-size: .88rem; line-height: 1.55; opacity: .75; margin-bottom: 14px; }
+.ac-hint { font-size: .76rem; opacity: .55; line-height: 1.5; margin-top: 12px; }
+.ac-error {
+  font-size: .82rem; line-height: 1.45; color: #8C3A31;
+  background: #fbf1ef; border: 1px solid #e8cdc8;
+  border-radius: 10px; padding: 9px 11px; margin-bottom: 10px;
+}
+.ac-who { font-size: .82rem; opacity: .6; margin-bottom: 12px; word-break: break-all; }
+.ac-switch {
+  font: inherit; font-size: .82rem; background: none; border: 0; cursor: pointer;
+  color: var(--herbs); text-decoration: underline; padding: 12px 0 0; width: 100%;
+}
+.ac-orders { display: grid; gap: 10px; }
+.aco { border: 1px solid var(--hair-soft); background: var(--paper); border-radius: 14px; padding: 11px 13px; }
+.aco header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.aco header span { font-size: .74rem; opacity: .55; }
+.aco header b { font-family: var(--serif); font-size: 1.05rem; color: var(--herbs); }
+.aco ul { list-style: none; display: grid; gap: 2px; font-size: .86rem; margin-bottom: 9px; }
+.aco-again {
+  font: inherit; font-size: .74rem; font-weight: 800; letter-spacing: .12em;
+  text-transform: uppercase; cursor: pointer; width: 100%;
+  border: 1px solid var(--herbs); background: none; color: var(--herbs);
+  border-radius: 99px; padding: 9px 12px;
+}
+.aco-again:disabled { opacity: .55; cursor: default; border-style: dashed; }
+[dir="rtl"] .aco-again { letter-spacing: 0; font-size: .86rem; text-transform: none; }
+.og-opt {
+  font-style: normal; font-size: .6rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; opacity: .45; margin-inline-start: 8px;
+}
+[dir="rtl"] .og-opt { letter-spacing: 0; font-size: .7rem; }
+
 #osheet { position: fixed; inset: 0; z-index: 910; visibility: hidden; }
 #osheet.is-open { visibility: visible; }
 #osheet .sheet-veil { opacity: 0; transition: opacity .35s; }

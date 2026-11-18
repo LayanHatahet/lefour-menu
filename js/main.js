@@ -1154,6 +1154,210 @@ function refreshPayEntry() {
   }
 }
 
+
+/* ══════════ COMPTE CLIENT (facultatif) ═══════════════════════════════
+   On peut commander toute sa vie sans compte. Celui-ci ne sert qu a
+   retrouver ses commandes passees et a les refaire d un geste. Il n est
+   jamais demande avant de payer, et jamais mis en travers du chemin.
+
+   La session tient dans un cookie HttpOnly pose par /api/account : le
+   navigateur s en occupe, aucun jeton ne traine dans localStorage.      */
+
+let ACCOUNT = null;        /* { signedIn, email, name, orders } */
+let AC_MODE = 'login';     /* 'login' ou 'register' */
+let OPEN_ACCOUNT = null;
+
+async function accountCall(body) {
+  const r = await fetch('/api/account', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const e = new Error(j.error || ('HTTP ' + r.status));
+    e.status = r.status;
+    throw e;
+  }
+  return j;
+}
+
+function accountErrorText(e) {
+  const m = String((e && e.message) || '');
+  if (e && e.status === 429) return t('accountMany');
+  if (m === 'account exists') return t('accountExists');
+  if (m === 'wrong email or password') return t('accountBad');
+  if (m === 'password too short') return t('accountShort');
+  return t('accountFail');
+}
+
+/* Refaire une commande : on repart des identifiants de plat et des formats,
+   jamais des prix d hier. Un plat epuise ou un format qui n existe plus est
+   simplement laisse de cote, et on le dit. */
+function accountReorder(cart) {
+  let added = 0, missed = 0;
+  for (const line of (cart || [])) {
+    const item = itemOf(line.id);
+    if (!item || isOff(line.id)) { missed++; continue; }
+    const kind = catOf(line.id) === 'minis' ? 'mini' : catOf(line.id);
+    const opts = sizeOptions(item, kind);
+    const opt = opts.find(o => o.k === line.size) || (opts.length === 1 ? opts[0] : null);
+    if (!opt) { missed++; continue; }
+    const code = opts.length > 1 || kind === 'mini' ? opt.k : '';
+    for (let i = 0; i < Math.min(line.qty || 1, 20); i++) {
+      cartAdd(item, kind, opt.p, code);
+    }
+    added++;
+  }
+  return { added, missed };
+}
+
+function accountOrderCard(o) {
+  const lines = (o.items || []).map(i =>
+    '<li>' + i.qty + ' &times; ' + escapeHtml(i.name) + '</li>').join('');
+  const when = (o.day || '') + (o.time ? ' · ' + o.time : '');
+  return '<article class="aco" data-acref="' + escapeHtml(o.ref || '') + '">' +
+    '<header><span>' + escapeHtml(when) + '</span><b>' +
+      (o.total != null ? fmtPrice(o.total) : '') + '</b></header>' +
+    '<ul>' + lines + '</ul>' +
+    ((o.cart && o.cart.length)
+      ? '<button type="button" class="aco-again" data-acagain="' + escapeHtml(o.ref || '') + '">' +
+        t('accountReorder') + '</button>'
+      : '') +
+    '</article>';
+}
+
+function accountRender() {
+  const form = $('#acForm'), home = $('#acHome');
+  if (!form || !home) return;
+  const inAccount = !!(ACCOUNT && ACCOUNT.signedIn);
+  form.hidden = inAccount;
+  home.hidden = !inAccount;
+
+  const entry = $('#osAccountLabel');
+  if (entry) entry.textContent = t('accountEntry');
+
+  if (!inAccount) {
+    const go = $('#acGo'), sw = $('#acSwitch'), pw = $('#acPassword');
+    if (go) go.textContent = AC_MODE === 'login' ? t('accountSignIn') : t('accountCreate');
+    if (sw) sw.textContent = AC_MODE === 'login' ? t('accountToCreate') : t('accountToSignIn');
+    if (pw) pw.setAttribute('autocomplete', AC_MODE === 'login' ? 'current-password' : 'new-password');
+    return;
+  }
+
+  const who = $('#acWho');
+  if (who) who.textContent = ACCOUNT.email || '';
+  const list = $('#acOrders');
+  const orders = ACCOUNT.orders || [];
+  if (list) {
+    list.innerHTML = orders.length
+      ? orders.map(accountOrderCard).join('')
+      : '<p class="ac-hint">' + t('accountNone') + '</p>';
+    $$('#acOrders [data-acagain]').forEach(b => b.addEventListener('click', () => {
+      const o = orders.find(x => x.ref === b.dataset.acagain);
+      if (!o) return;
+      const { added, missed } = accountReorder(o.cart);
+      b.textContent = added ? t('accountReordered') : t('accountGone');
+      b.disabled = true;
+      if (added && missed) alert(t('accountGone'));
+    }));
+  }
+  const out = $('#acOut');
+  if (out) out.textContent = t('accountOut');
+}
+
+function escapeHtml(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function accountLoad() {
+  try {
+    const r = await fetch('/api/account', { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.available) return;              /* stockage absent : pas de compte */
+    ACCOUNT = j;
+    const grp = $('#osAccountGroup');
+    if (grp) grp.hidden = false;
+    accountRender();
+  } catch (e) { /* le compte est un bonus : son absence ne casse rien */ }
+}
+
+function bindAccount() {
+  const sheet = $('#acsheet');
+  if (!sheet) return;
+  const open = () => {
+    sheet.classList.add('is-open');
+    sheet.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    accountRender();
+  };
+  const close = () => {
+    sheet.classList.remove('is-open');
+    sheet.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  };
+  OPEN_ACCOUNT = open;
+  $$('#acsheet [data-acclose]').forEach(el => el.addEventListener('click', close));
+  addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+  const entry = $('#osAccount');
+  if (entry) entry.addEventListener('click', () => {
+    const os = $('#osheet');
+    if (os) { os.classList.remove('is-open'); os.setAttribute('aria-hidden', 'true'); }
+    open();
+  });
+
+  const sw = $('#acSwitch');
+  if (sw) sw.addEventListener('click', () => {
+    AC_MODE = AC_MODE === 'login' ? 'register' : 'login';
+    const err = $('#acError');
+    if (err) err.hidden = true;
+    accountRender();
+  });
+
+  const go = $('#acGo');
+  if (go) go.addEventListener('click', async () => {
+    const err = $('#acError');
+    const email = ($('#acEmail').value || '').trim();
+    const password = $('#acPassword').value || '';
+    if (err) err.hidden = true;
+    if (!email || password.length < 8) {
+      if (err) { err.textContent = t('accountShort'); err.hidden = false; }
+      return;
+    }
+    const was = go.textContent;
+    go.disabled = true;
+    go.textContent = t('accountBusy');
+    try {
+      ACCOUNT = await accountCall({ action: AC_MODE, email, password });
+      $('#acPassword').value = '';
+      track(AC_MODE === 'register' ? 'account_create' : 'account_login');
+      accountRender();
+    } catch (e) {
+      if (err) { err.textContent = accountErrorText(e); err.hidden = false; }
+      /* « ce compte existe deja » est une invitation a se connecter */
+      if (String(e.message) === 'account exists') { AC_MODE = 'login'; }
+      accountRender();
+    } finally {
+      go.disabled = false;
+      if (go.textContent === t('accountBusy')) go.textContent = was;
+    }
+  });
+
+  const out = $('#acOut');
+  if (out) out.addEventListener('click', async () => {
+    try { await accountCall({ action: 'logout' }); } catch (e) {}
+    ACCOUNT = { signedIn: false, available: true };
+    AC_MODE = 'login';
+    accountRender();
+  });
+
+  accountLoad();
+}
+
 function bindOrderSheet() {
   const os = $('#osheet');
   const openBtn = $('#orderOpen');
@@ -1525,6 +1729,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindContact();
   bindOrderSheet();
   bindCart();
+  bindAccount();
   bindSheetAdd();
   const sbc = $('#sbCall');
   if (sbc) sbc.href = 'tel:+' + INFO.phoneRaw;

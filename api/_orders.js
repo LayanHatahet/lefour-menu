@@ -13,6 +13,8 @@
    Le nom de fichier commence par un souligne : Vercel n en fait pas une
    route, c est du code partage entre /api/webhook et /api/orders.          */
 
+const crypto = require('crypto');
+
 const BLOB = 'https://blob.vercel-storage.com';
 const V = '7';
 
@@ -21,8 +23,23 @@ const PUBLIC = (process.env.BLOB_PUBLIC_BASE
 
 function token() { return process.env.BLOB_READ_WRITE_TOKEN || ''; }
 
+/* Le stockage Blob sert tout en lecture publique : qui connait l adresse
+   d un fichier peut le lire. « orders/2026-11.json » se devine en une
+   seconde, et ce fichier porte le nom, le courriel et le telephone de
+   chaque client. Les chemins passent donc par un segment derive d un
+   secret : 256 bits qu on ne devine pas.
+
+   Le secret vient de CUSTOMER_SECRET s il existe, sinon du jeton Blob,
+   qui est deja secret et deja present — personne n a de variable de plus
+   a poser. Changer ce secret rend les anciens fichiers introuvables sans
+   les detruire ; Stripe reste de toute facon le registre d origine. */
+function vault() {
+  const secret = process.env.CUSTOMER_SECRET || process.env.BLOB_READ_WRITE_TOKEN || '';
+  return crypto.createHmac('sha256', secret).update('lefour-orders-v1').digest('hex').slice(0, 32);
+}
+
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
-function monthPath(month) { return `orders/${month}.json`; }
+function monthPath(month) { return `${vault()}/orders/${month}.json`; }
 
 /* Montreal, toujours : une commande de 21 h le 30 novembre appartient au mois
    de novembre pour la boulangerie, meme s il est deja le 1er decembre a UTC.
@@ -91,11 +108,11 @@ async function writeMonth(month, orders) {
 
 /* Les mois qui contiennent quelque chose. Ecrit une fois par mois, a la
    premiere commande : c est ce qui remplace un list() sur le stockage. */
-const INDEX_PATH = 'orders/index.json';
+function indexPath() { return `${vault()}/orders/index.json`; }
 
 async function readIndex() {
   if (!token()) return [];
-  const r = await fetch(`${PUBLIC}/${INDEX_PATH}?v=${Date.now()}`);
+  const r = await fetch(`${PUBLIC}/${indexPath()}?v=${Date.now()}`);
   if (!r.ok) return [];
   const j = await r.json().catch(() => null);
   const months = (j && Array.isArray(j.months)) ? j.months : [];
@@ -106,7 +123,7 @@ async function noteMonth(month) {
   const months = await readIndex();
   if (months.indexOf(month) > -1) return;
   const next = months.concat([month]).sort().reverse();
-  const put = await fetch(`${BLOB}/${INDEX_PATH}`, {
+  const put = await fetch(`${BLOB}/${indexPath()}`, {
     method: 'PUT',
     headers: {
       authorization: `Bearer ${token()}`,
@@ -144,7 +161,71 @@ async function addOrder(order) {
   throw new Error('order not persisted');
 }
 
+/* ── Clients ──────────────────────────────────────────────────────────
+   L historique d un client est range sous une empreinte de son courriel,
+   calculee avec le meme secret : connaitre l adresse ne suffit pas a
+   trouver le fichier. Un seul fichier par personne, lu par son chemin :
+   toujours pas de list(). */
+function customerKey(email) {
+  const secret = process.env.CUSTOMER_SECRET || process.env.BLOB_READ_WRITE_TOKEN || '';
+  const clean = String(email || '').trim().toLowerCase();
+  return crypto.createHmac('sha256', secret).update('lefour-customer-v1:' + clean).digest('hex');
+}
+function customerPath(email) { return `${vault()}/c/${customerKey(email)}.json`; }
+
+async function readCustomer(email) {
+  if (!token()) return null;
+  const r = await fetch(`${PUBLIC}/${customerPath(email)}?v=${Date.now()}`);
+  if (r.ok) return await r.json().catch(() => null);
+  const text = await r.text().catch(() => '');
+  if (/store is blocked/i.test(text)) { const e = new Error('storage blocked'); e.blocked = true; throw e; }
+  if (r.status === 404) return null;
+  throw new Error('customer unavailable');
+}
+
+async function writeCustomer(email, record) {
+  const put = await fetch(`${BLOB}/${customerPath(email)}`, {
+    method: 'PUT',
+    headers: {
+      authorization: `Bearer ${token()}`,
+      'x-api-version': V,
+      'x-content-type': 'application/json',
+      'x-add-random-suffix': '0',
+      'x-allow-overwrite': '1',
+      'x-cache-control-max-age': '5',
+    },
+    body: JSON.stringify(record),
+  });
+  if (!put.ok) {
+    const t = await put.text().catch(() => '');
+    if (/store is blocked/i.test(t)) { const e = new Error('storage blocked'); e.blocked = true; throw e; }
+    throw new Error('could not save customer');
+  }
+}
+
+/* L historique se remplit meme sans compte : le jour ou la personne en
+   cree un avec la meme adresse, ses commandes passees sont deja la. */
+async function noteCustomerOrder(order) {
+  if (!order.email) return;
+  let rec = null;
+  try { rec = await readCustomer(order.email); } catch (e) { if (e.blocked) throw e; }
+  if (!rec || typeof rec !== 'object') rec = { email: order.email, orders: [] };
+  if (!Array.isArray(rec.orders)) rec.orders = [];
+  if (rec.orders.some(o => o.id === order.id)) return;
+  rec.orders.push({
+    id: order.id, ref: order.ref, paidAt: order.paidAt, day: order.day, time: order.time,
+    total: order.total, currency: order.currency, cart: order.cart || [],
+    items: (order.items || []).map(i => ({ name: i.name, qty: i.qty })),
+  });
+  rec.orders.sort((a, b) => String(b.paidAt).localeCompare(String(a.paidAt)));
+  /* on garde les vingt dernieres : de quoi recommander, pas une archive */
+  rec.orders = rec.orders.slice(0, 20);
+  if (order.name && !rec.name) rec.name = order.name;
+  await writeCustomer(order.email, rec);
+}
+
 module.exports = {
   MONTH_RE, monthOf, dayOf, clockOf, montrealParts,
   readMonth, writeMonth, addOrder, readIndex, noteMonth, token,
+  customerKey, readCustomer, writeCustomer, noteCustomerOrder,
 };

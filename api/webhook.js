@@ -217,6 +217,16 @@ module.exports = async (req, res) => {
     const order = await buildOrder(session);
     const { added } = await ORDERS.addOrder(order);
 
+    /* L historique personnel se remplit des maintenant, compte ou pas :
+       quand la personne en creera un avec la meme adresse, ses commandes
+       passees seront deja la, prêtes a etre recommandees. Un echec ici ne
+       doit pas faire reessayer tout le webhook : la commande, elle, est
+       bien enregistree. */
+    if (added) {
+      try { await ORDERS.noteCustomerOrder(order); }
+      catch (e) { console.error('customer history not updated:', e && e.message); }
+    }
+
     if (added && order.receipt && order.email && session.payment_intent) {
       await sendReceipt(String(session.payment_intent), order.email);
     }
