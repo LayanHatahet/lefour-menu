@@ -215,3 +215,69 @@ body.is-paused .gal button,body.is-paused #saveBar{pointer-events:none;opacity:.
   .msum { display: none; }
   .mprice input { width: 92px; }
 }
+
+
+/* ══════════ COMMANDES ═══════════════════════════════════════════════ */
+
+.obar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 14px 0 18px; }
+.ofld { min-width: 190px; }
+.ofld select { font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--hair, #e0d9cc); background: #fff; width: 100%; }
+.mini--go { background: #46522A; border-color: #46522A; color: #fff; }
+.mini--go:hover { background: #3a4522; }
+.mini--go[disabled] { opacity: .55; cursor: progress; }
+
+/* Les chiffres du mois. Le total encaisse est le seul en gros : c est
+   celui qu on vient chercher, les autres servent a le justifier. */
+.ostats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.ostat {
+  flex: 1 1 120px; background: #fff; border: 1px solid var(--hair, #e0d9cc);
+  border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px;
+}
+.ostat b { font-size: 1.15rem; font-family: Fraunces, Georgia, serif; font-weight: 600; }
+.ostat span { font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; opacity: .55; }
+.ostat--big { background: #46522A; border-color: #46522A; color: #fff; }
+.ostat--big span { opacity: .75; }
+
+.ocal { margin-bottom: 18px; }
+.ocal-head, .ocal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.ocal-head span { font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; opacity: .5; text-align: center; padding-bottom: 6px; }
+.ocell {
+  font: inherit; text-align: left; cursor: default;
+  border: 1px solid var(--hair, #e0d9cc); background: #fff; border-radius: 10px;
+  padding: 7px 8px; min-height: 64px; display: grid; align-content: start; gap: 1px;
+}
+.ocell--pad { border: 0; background: none; min-height: 0; }
+.ocell i { font-style: normal; font-size: .72rem; opacity: .45; }
+.ocell b { font-size: 1rem; font-family: Fraunces, Georgia, serif; }
+.ocell em { font-style: normal; font-size: .64rem; opacity: .6; }
+.ocell.has { cursor: pointer; border-color: #c3cBa6; background: #f7f8f1; }
+.ocell.has:hover { border-color: #6E7A35; }
+.ocell.is-on { background: #46522A; border-color: #46522A; color: #fff; }
+.ocell.is-on i, .ocell.is-on em { opacity: .8; }
+.ocell[disabled] { opacity: .75; }
+
+.ofilter { margin: -6px 0 12px; }
+.linkish { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; color: #46522A; text-decoration: underline; }
+
+.olist { display: grid; gap: 10px; }
+.ocard { background: #fff; border: 1px solid var(--hair, #e0d9cc); border-radius: 12px; padding: 12px 14px; }
+.ocard header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.owhen { font-size: .76rem; font-weight: 700; }
+.oref { font-size: .66rem; opacity: .45; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.otest { font-size: .58rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; background: #B4493F; color: #fff; border-radius: 99px; padding: 2px 7px; }
+.owho { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; font-size: .82rem; }
+.owho a { color: #46522A; }
+.otag { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; opacity: .55; }
+.oitems { list-style: none; display: grid; gap: 2px; margin: 0 0 6px; font-size: .84rem; }
+.oitems li { display: flex; justify-content: space-between; gap: 12px; }
+.oitems span { opacity: .55; font-variant-numeric: tabular-nums; }
+.onote { font-size: .82rem; opacity: .7; font-style: italic; margin-bottom: 6px; }
+.ocard footer { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-top: 1px solid var(--hair, #e0d9cc); padding-top: 8px; font-size: .74rem; }
+.ocard footer span { opacity: .55; }
+.ocard footer b { font-size: 1.05rem; font-family: Fraunces, Georgia, serif; color: #46522A; }
+
+@media (max-width: 640px) {
+  .ocell { min-height: 54px; padding: 5px 6px; }
+  .ocell em { display: none; }
+  .ostat { flex-basis: 45%; }
+}

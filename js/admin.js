@@ -624,13 +624,218 @@ async function saveSettings() {
   } finally { btn.disabled = false; }
 }
 
+
+/* ══════════ COMMANDES ═══════════════════════════════════════════════
+   Les commandes ne font pas partie des « reglages » : on ne les modifie
+   pas, on les consulte. Elles ont donc leur propre appel, leur propre
+   onglet, et rien ici ne touche a DIRTY ni a « Save changes ».         */
+
+let ORD_MONTH = '';
+let ORD_DATA = null;
+let ORD_DAY = '';
+
+const ORD_MONTHS_FR = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+function money(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return '—';
+  return v.toFixed(2).replace('.', ',') + ' $';
+}
+
+function thisMonth() {
+  /* le mois de Montreal, pas celui du navigateur de qui regarde */
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Toronto', year: 'numeric', month: '2-digit',
+  }).formatToParts(new Date());
+  const g = {};
+  for (const x of p) g[x.type] = x.value;
+  return g.year + '-' + g.month;
+}
+
+function monthLabel(m) {
+  const bits = String(m).split('-');
+  return (ORD_MONTHS_FR[Number(bits[1]) - 1] || m) + ' ' + bits[0];
+}
+
+async function loadOrderMonths() {
+  const sel = $('#ordMonth');
+  if (!sel) return;
+  let months = [];
+  try {
+    const j = await api('/api/orders');
+    months = Array.isArray(j.months) ? j.months : [];
+  } catch (e) { /* un index vide n est pas une panne : il n y a rien encore */ }
+  const now = thisMonth();
+  if (months.indexOf(now) === -1) months.unshift(now);
+  sel.innerHTML = months.map(m =>
+    '<option value="' + m + '">' + esc(monthLabel(m)) + '</option>').join('');
+  ORD_MONTH = ORD_MONTH && months.indexOf(ORD_MONTH) > -1 ? ORD_MONTH : months[0];
+  sel.value = ORD_MONTH;
+}
+
+async function loadOrders(month) {
+  const list = $('#ordList');
+  if (!list) return;
+  ORD_MONTH = month;
+  ORD_DAY = '';
+  list.innerHTML = '<p class="muted">Loading…</p>';
+  $('#ordCal').innerHTML = '';
+  $('#ordStats').innerHTML = '';
+  try {
+    ORD_DATA = await api('/api/orders?month=' + encodeURIComponent(month));
+  } catch (e) {
+    ORD_DATA = null;
+    list.innerHTML = '<p class="muted">Could not load orders: ' + esc(e.message) + '</p>';
+    return;
+  }
+  renderOrders();
+}
+
+function renderOrderStats() {
+  const t = (ORD_DATA && ORD_DATA.totals) || { count: 0, subtotal: 0, tps: 0, tvq: 0, total: 0 };
+  $('#ordStats').innerHTML =
+    '<div class="ostat"><b>' + t.count + '</b><span>orders</span></div>' +
+    '<div class="ostat"><b>' + money(t.subtotal) + '</b><span>before tax</span></div>' +
+    '<div class="ostat"><b>' + money(t.tps) + '</b><span>GST collected</span></div>' +
+    '<div class="ostat"><b>' + money(t.tvq) + '</b><span>QST collected</span></div>' +
+    '<div class="ostat ostat--big"><b>' + money(t.total) + '</b><span>taken in</span></div>';
+}
+
+/* Le calendrier : une case par jour du mois, les jours vides restent
+   visibles pour qu on lise le rythme de la semaine d un coup d oeil. */
+function renderOrderCal() {
+  const host = $('#ordCal');
+  if (!host || !ORD_DATA) return;
+  const bits = ORD_MONTH.split('-');
+  const y = Number(bits[0]), m = Number(bits[1]);
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  /* getUTCDay : 0 = dimanche. La semaine commence lundi dans un commerce. */
+  const first = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+  const byDay = ORD_DATA.days || {};
+
+  let cells = '';
+  for (let i = 0; i < first; i++) cells += '<i class="ocell ocell--pad"></i>';
+  for (let d = 1; d <= days; d++) {
+    const key = ORD_MONTH + '-' + String(d).padStart(2, '0');
+    const info = byDay[key];
+    cells += '<button type="button" class="ocell' + (info ? ' has' : '') +
+      (ORD_DAY === key ? ' is-on' : '') + '" data-oday="' + key + '"' +
+      (info ? '' : ' disabled') + '>' +
+      '<i>' + d + '</i>' +
+      (info ? '<b>' + info.count + '</b><em>' + money(info.total) + '</em>' : '') +
+      '</button>';
+  }
+
+  host.innerHTML =
+    '<div class="ocal-head"><span>Mon</span><span>Tue</span><span>Wed</span>' +
+    '<span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>' +
+    '<div class="ocal-grid">' + cells + '</div>';
+
+  $$('#ordCal [data-oday]').forEach(b => b.addEventListener('click', () => {
+    ORD_DAY = ORD_DAY === b.dataset.oday ? '' : b.dataset.oday;
+    renderOrders();
+  }));
+}
+
+function orderCard(o) {
+  const items = (o.items || []).map(i =>
+    '<li>' + i.qty + ' &times; ' + esc(i.name) +
+    '<span>' + money(i.total) + '</span></li>').join('');
+  const tax = (Number(o.tps) || 0) + (Number(o.tvq) || 0);
+  return '<article class="ocard">' +
+    '<header><span class="owhen">' + esc(o.day) + ' · ' + esc(o.time || '') + '</span>' +
+    '<span class="oref">' + esc(o.ref || '') + '</span>' +
+    (o.mode === 'test' ? '<span class="otest">test</span>' : '') + '</header>' +
+    '<div class="owho">' +
+      '<b>' + esc(o.name || '—') + '</b>' +
+      (o.phone ? '<a href="tel:' + esc(o.phone) + '">' + esc(o.phone) + '</a>' : '') +
+      (o.email ? '<a href="mailto:' + esc(o.email) + '">' + esc(o.email) + '</a>' : '') +
+      (o.receipt ? '<span class="otag">receipt sent</span>' : '') +
+    '</div>' +
+    '<ul class="oitems">' + items + '</ul>' +
+    (o.note ? '<p class="onote">“' + esc(o.note) + '”</p>' : '') +
+    '<footer>' +
+      (tax > 0 ? '<span>GST ' + money(o.tps) + ' · QST ' + money(o.tvq) + '</span>' : '<span>no tax</span>') +
+      '<b>' + money(o.total) + '</b>' +
+    '</footer></article>';
+}
+
+function renderOrders() {
+  if (!ORD_DATA) return;
+  renderOrderStats();
+  renderOrderCal();
+  const all = ORD_DATA.orders || [];
+  const shown = ORD_DAY ? all.filter(o => o.day === ORD_DAY) : all;
+  const note = $('#ordFilter');
+  if (note) {
+    note.hidden = !ORD_DAY;
+    note.innerHTML = ORD_DAY
+      ? 'Showing ' + shown.length + ' order' + (shown.length === 1 ? '' : 's') +
+        ' from ' + esc(ORD_DAY) + ' — <button type="button" class="linkish" id="ordAll">show the whole month</button>'
+      : '';
+    const back = $('#ordAll');
+    if (back) back.addEventListener('click', () => { ORD_DAY = ''; renderOrders(); });
+  }
+  $('#ordList').innerHTML = shown.length
+    ? shown.slice().reverse().map(orderCard).join('')
+    : '<p class="muted">No orders' + (ORD_DAY ? ' that day' : ' yet this month') +
+      '. Card payments made on the website land here by themselves.</p>';
+}
+
+/* Le fichier est protege par la cle admin, qu un lien ordinaire ne peut pas
+   porter : on le recupere par fetch puis on le remet au navigateur. */
+async function downloadOrdersXlsx() {
+  const btn = $('#ordXlsx');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/orders?format=xlsx&month=' + encodeURIComponent(ORD_MONTH), {
+      headers: { 'x-admin-key': KEY },
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error || ('HTTP ' + r.status));
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'le-four-commandes-' + ORD_MONTH + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast('Excel file downloaded');
+  } catch (e) {
+    toast('Error: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function bindOrders() {
+  const sel = $('#ordMonth');
+  if (sel) sel.addEventListener('change', () => loadOrders(sel.value));
+  const ref = $('#ordRefresh');
+  if (ref) ref.addEventListener('click', () => loadOrders(ORD_MONTH));
+  const dl = $('#ordXlsx');
+  if (dl) dl.addEventListener('click', downloadOrdersXlsx);
+}
+
+async function openOrdersTab() {
+  await loadOrderMonths();
+  if (ORD_MONTH) await loadOrders(ORD_MONTH);
+}
+
 function bindTabs() {
   $$('.atab').forEach(b => b.addEventListener('click', () => {
     $$('.atab').forEach(x => x.classList.toggle('is-on', x === b));
     $$('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + b.dataset.tab; });
     if (b.dataset.tab === 'seo') renderAlts();
     if (b.dataset.tab === 'menu') renderMenuEditor();
+    if (b.dataset.tab === 'orders') openOrdersTab();
   }));
+  bindOrders();
   const sb = $('#saveBtn');
   if (sb) sb.addEventListener('click', saveSettings);
   addEventListener('beforeunload', (e) => { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });

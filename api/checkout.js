@@ -111,6 +111,36 @@ const SIZE_LABEL = {
 };
 const LANGS = ['fr', 'en', 'ar'];
 
+/* Le recu par courriel est propose, pas impose : Stripe demande de toute
+   facon une adresse pour la transaction, mais rien n est envoye tant que
+   le client n a pas dit oui. C est le webhook qui pose alors receipt_email
+   sur le paiement, et Stripe envoie son propre recu.
+   Pour que ce choix veuille dire quelque chose, l envoi automatique de
+   Stripe (Settings -> Emails -> Successful payments) doit rester ferme ;
+   sinon tout le monde recoit un recu, qu il l ait demande ou non. */
+const RECEIPT_FIELD = {
+  fr: { label: 'Recevoir le reçu par courriel', yes: 'Oui, merci', no: 'Non' },
+  en: { label: 'Email me the receipt', yes: 'Yes, please', no: 'No' },
+  ar: { label: 'ابعتولي الإيصال عالإيميل', yes: 'نعم', no: 'لا' },
+};
+
+function receiptField(lang) {
+  const c = RECEIPT_FIELD[lang] || RECEIPT_FIELD.fr;
+  return {
+    key: 'receipt',
+    type: 'dropdown',
+    label: { type: 'custom', custom: c.label },
+    optional: false,
+    dropdown: {
+      default_value: 'yes',
+      options: [
+        { label: c.yes, value: 'yes' },
+        { label: c.no, value: 'no' },
+      ],
+    },
+  };
+}
+
 /* Stripe's API takes form encoding, including for nested fields:
    line_items[0][price_data][unit_amount]=400 */
 function formEncode(obj, prefix, out) {
@@ -232,6 +262,7 @@ module.exports = async (req, res) => {
     const line_items = [];
     const summary = [];
     const soldOut = [];
+    const compact = [];
     let anyTaxed = false;
     for (const raw of cart) {
       const id = String(raw && raw.id || '');
@@ -270,6 +301,10 @@ module.exports = async (req, res) => {
         },
       });
       summary.push(`${qty}x ${name} (${sizeLabel})`);
+      /* « zaatar:R:2 » — de quoi refaire exactement la meme commande plus
+         tard depuis l historique du client, sans dependre du libelle
+         affiche, qui depend de la langue et peut changer. */
+      compact.push(`${id}:${sizeKey}:${qty}`);
     }
 
     if (!line_items.length) {
@@ -296,6 +331,7 @@ module.exports = async (req, res) => {
       success_url: `${origin}/merci?lang=${lang}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/commande-annulee?lang=${lang}`,
       phone_number_collection: { enabled: true },
+      custom_fields: [receiptField(lang)],
       /* orders are collected at the bakery */
       custom_text: {
         submit: {
@@ -316,8 +352,13 @@ module.exports = async (req, res) => {
          sens pour un manouche a 4 $. « card » couvre aussi Apple Pay et
          Google Pay, qui restent proposes. */
       payment_method_types: ['card'],
+      /* Stripe plafonne chaque valeur a 500 caracteres : un gros panier
+         passe sur une deuxieme cle plutot que d etre tronque au milieu
+         d une ligne. Au-dela, la commande reste lisible dans `order`. */
       metadata: {
         order: summary.join(', ').slice(0, 450),
+        cart: compact.join('|').slice(0, 480),
+        cart2: compact.join('|').slice(480, 960),
         note: note,
         lang: lang,
         fulfilment: 'pickup',

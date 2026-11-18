@@ -24,6 +24,17 @@ cp -r "$HERE/css" "$HERE/js" "$HERE/assets" "$OUT/"
 cp -r "$PAYLOAD/api" "$OUT/"
 cp "$PAYLOAD/vercel.json" "$OUT/"
 
+# Le lien vers le projet Vercel. Sans lui, `vercel deploy` prend le nom du
+# dossier pour un nouveau projet et cree un site parallele au lieu de mettre
+# a jour lefourboulangerie.com — c est arrive.
+# Il vient du payload, pas du depot : le .vercel versionne pointe encore
+# vers l ancien compte Vercel, alors que le site vit sur le compte layan16.
+if [ -d "$PAYLOAD/.vercel" ]; then
+  cp -r "$PAYLOAD/.vercel" "$OUT/"
+else
+  echo "WARNING: no .vercel link in $PAYLOAD - deploying would create a NEW project" >&2
+fi
+
 # inline the CSS and the menu scripts, write /en and /ar, emit menu-prices.json
 ( cd "$HERE" && node build-inline.js "$OUT" )
 
