@@ -14,7 +14,88 @@
    on top, exactly as the site applies them. A tampered cart cannot change what
    the customer is charged.                                                   */
 
-const STRIPE_API = 'https://api.stripe.com/v1/checkout/sessions';
+const STRIPE_BASE = 'https://api.stripe.com/v1';
+const STRIPE_API = `${STRIPE_BASE}/checkout/sessions`;
+
+/* ── Taxes (Quebec) ─────────────────────────────────────────────────
+   Un repas prepare est taxable, sauf vendu par six portions ou plus :
+   les boites de 6 et les douzaines de bouchees passent alors comme
+   epicerie de base et ne portent aucune taxe. C est la regle que le
+   client a donnee, et c est aussi celle de Revenu Quebec.
+   La TVQ se calcule sur le prix avant TPS, pas l une sur l autre :
+   deux taux exclusifs appliques a la meme base, jamais composes. */
+const TAX_SPECS = [
+  { key: 'tps', display_name: 'TPS', percentage: '5',
+    tax_type: 'gst', description: 'TPS 5 % — Canada' },
+  { key: 'tvq', display_name: 'TVQ', percentage: '9.975',
+    tax_type: 'qst', description: 'TVQ 9,975 % — Québec' },
+];
+
+/* B = boite de 6, 12 = douzaine de bouchees : six portions ou plus. */
+const UNTAXED_SIZES = { B: true, '12': true };
+
+/* Le tableau de bord peut forcer le resultat plat par plat :
+   '' ou absent = la regle, 'on' = toujours taxe, 'off' = jamais. */
+function lineTaxable(cat, sizeKey, ov) {
+  const forced = ov && typeof ov.tax === 'string' ? ov.tax : '';
+  if (forced === 'on') return true;
+  if (forced === 'off') return false;
+  if (UNTAXED_SIZES[sizeKey]) return false;
+  if (cat === 'minis') return false;
+  return true;
+}
+
+function stripeHeaders() {
+  return {
+    authorization: `Bearer ${stripeKey()}`,
+    'content-type': 'application/x-www-form-urlencoded',
+  };
+}
+
+/* Les deux taux vivent dans le compte Stripe, pas dans le code : Stripe
+   les affiche alors comme deux lignes nommees sur la page de paiement et
+   sur le recu. On les cree au premier paiement et on retient leurs ids
+   pour la duree du conteneur — le mode test et le mode reel ont chacun
+   les siens, et c est la cle en place qui decide lesquels on touche. */
+let TAX_MEMO = null;
+async function taxRateIds() {
+  if (TAX_MEMO) return TAX_MEMO;
+  const found = {};
+  const r = await fetch(`${STRIPE_BASE}/tax_rates?limit=100`, { headers: stripeHeaders() });
+  const j = await r.json().catch(() => ({}));
+  for (const tr of (j && j.data) || []) {
+    const key = tr && tr.metadata && tr.metadata.lefour;
+    const spec = TAX_SPECS.find(x => x.key === key);
+    /* un taux au mauvais pourcentage n est pas reutilise : si Quebec change
+       la TVQ, on en cree un nouveau plutot que de corriger l ancien, pour
+       que les anciens recus gardent le taux qui leur a ete applique. */
+    if (!spec || tr.active === false) continue;
+    if (Number(tr.percentage) !== Number(spec.percentage)) continue;
+    found[key] = tr.id;
+  }
+  for (const spec of TAX_SPECS) {
+    if (found[spec.key]) continue;
+    const body = formEncode({
+      display_name: spec.display_name,
+      description: spec.description,
+      percentage: spec.percentage,
+      inclusive: false,
+      tax_type: spec.tax_type,
+      country: 'CA',
+      state: 'QC',
+      jurisdiction: 'Québec',
+      metadata: { lefour: spec.key },
+    }).join('&');
+    const cr = await fetch(`${STRIPE_BASE}/tax_rates`, {
+      method: 'POST', headers: stripeHeaders(), body,
+    });
+    const cj = await cr.json().catch(() => ({}));
+    if (!cr.ok || !cj.id) throw new Error(`tax rate ${spec.key}: ${(cj.error && cj.error.message) || cr.status}`);
+    found[spec.key] = cj.id;
+  }
+  TAX_MEMO = TAX_SPECS.map(x => found[x.key]);
+  return TAX_MEMO;
+}
 
 /* Only ever read from the environment. The key is never in the code or the
    repo: add STRIPE_SECRET_KEY in Vercel -> Project -> Settings -> Env Vars. */
@@ -147,6 +228,7 @@ module.exports = async (req, res) => {
 
     const line_items = [];
     const summary = [];
+    let anyTaxed = false;
     for (const raw of cart) {
       const id = String(raw && raw.id || '');
       const base = book.items[id];
@@ -167,8 +249,11 @@ module.exports = async (req, res) => {
         ? name
         : `${name} — ${sizeLabel}`;
 
+      const taxed = lineTaxable(base.cat, sizeKey, book.overrides[id]);
+      if (taxed) anyTaxed = true;
       line_items.push({
         quantity: qty,
+        taxed: taxed,                        /* retire avant l envoi a Stripe */
         price_data: {
           currency: book.currency,
           unit_amount: Math.round(unit * 100),
@@ -179,6 +264,14 @@ module.exports = async (req, res) => {
     }
 
     if (!line_items.length) return res.status(400).json({ error: 'nothing payable in this cart' });
+
+    /* On ne va chercher les taux que s il y a vraiment quelque chose a taxer :
+       un panier de boites de 6 n a aucune raison d appeler Stripe pour rien. */
+    const rates = anyTaxed ? await taxRateIds() : null;
+    for (const li of line_items) {
+      if (li.taxed && rates) li.tax_rates = rates;
+      delete li.taxed;
+    }
 
     const note = String(body.note || '').trim().slice(0, 450);
     const payload = {

@@ -4,7 +4,7 @@
    /sitemap.xml -> /api/seo?f=sitemap                                        */
 
 module.exports = (req, res) => {
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'lefour.vercel.app';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'lefourboulangerie.com';
   const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0];
   const base = `${proto}://${host}`;
   const which = (req.query && req.query.f) || 'robots';
