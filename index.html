@@ -350,7 +350,15 @@
         <div class="cart-foot" id="cartFoot" hidden>
           <label class="cfield cart-note"><span data-i18n="cartNote">Une note pour la boulangerie ?</span>
             <textarea id="cartNote" rows="2"></textarea></label>
+          <!-- Le detail n apparait que s il y a vraiment de la taxe : un
+               panier de boites de 6 n affiche que son total. -->
+          <div class="cart-tax" id="cartTax" hidden>
+            <p><span data-i18n="cartSubtotal">Sous-total</span><b id="cartSub">—</b></p>
+            <p><span data-i18n="taxTps">TPS (5 %)</span><b id="cartTps">—</b></p>
+            <p><span data-i18n="taxTvq">TVQ (9,975 %)</span><b id="cartTvq">—</b></p>
+          </div>
           <p class="cart-total"><span data-i18n="cartTotal">Total</span><b id="cartTotal">—</b></p>
+          <p class="cart-taxnote" id="cartTaxNote" data-i18n="taxNote" hidden>Taxes sur les portions individuelles.</p>
           <p class="cart-hint" data-i18n="cartHint">On confirme tout par WhatsApp avant de préparer.</p>
           <!-- paiement en ligne : masque tant que STRIPE_SECRET_KEY n est pas
                configure sur Vercel, pour ne jamais montrer un bouton mort -->

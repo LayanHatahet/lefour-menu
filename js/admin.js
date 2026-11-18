@@ -334,6 +334,32 @@ function menuChangedLabel(id) {
   return o && Object.keys(o).length ? 'Edited' : '';
 }
 
+function isSoldOut(id) {
+  const o = SETTINGS.menu && SETTINGS.menu[id];
+  return !!(o && o.off);
+}
+
+/* L interrupteur de rupture ne passe PAS par « Save changes » : pendant le
+   service on veut un geste, pas un formulaire, et surtout on ne veut pas
+   publier au passage des prix a moitie saisis. /api/stock ne touche que ce
+   champ-la, sur la version enregistree. */
+async function setSoldOut(id, off) {
+  const btn = $('[data-mstock="' + id + '"]');
+  if (btn) btn.disabled = true;
+  try {
+    await api('/api/stock', { method: 'POST', body: JSON.stringify({ id: id, off: off }) });
+    const bag = menuOv(id, true);
+    if (off) bag.off = true; else delete bag.off;
+    pruneMenuOv(id);
+    refreshMenuRow(id);
+    toast(off ? 'Marked sold out - live on the site' : 'Back on sale - live on the site');
+  } catch (e) {
+    toast('Error: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function refreshMenuRow(id) {
   const it = menuBaseOf(id);
   if (!it) return;
@@ -343,6 +369,15 @@ function refreshMenuRow(id) {
   if (ch) ch.textContent = menuChangedLabel(id);
   const row = $('[data-mitem="' + id + '"]');
   if (row) row.classList.toggle('is-edited', !!menuChangedLabel(id));
+  const out = isSoldOut(id);
+  const btn = $('[data-mstock="' + id + '"]');
+  if (btn) {
+    btn.classList.toggle('is-out', out);
+    btn.textContent = out ? 'Sold out' : 'On sale';
+    btn.setAttribute('aria-pressed', String(out));
+    btn.title = out ? 'Click to put it back on sale' : 'Click to mark it sold out';
+  }
+  if (row) row.classList.toggle('is-out', out);
 }
 
 function menuRowHtml(it) {
@@ -376,10 +411,18 @@ function menuRowHtml(it) {
     '</span>' +
     '<span class="rname">' + esc(it.name.en) + '<small>' + it.id + '</small></span>' +
     '<span class="msum" data-msum="' + it.id + '"></span>' +
-    '<span class="mflag" data-mchanged="' + it.id + '"></span></summary>' +
+    '<span class="mflag" data-mchanged="' + it.id + '"></span>' +
+    '<button type="button" class="mstock" data-mstock="' + it.id + '" aria-pressed="false">On sale</button>' +
+    '</summary>' +
     '<div class="mbody">' +
       '<div class="mprices">' + prices + '</div>' +
       '<div class="grid2">' + texts + '</div>' +
+      '<label class="fld mtax"><span>Taxes (GST 5% + QST 9.975%)</span>' +
+        '<select data-menu-tax="' + it.id + '">' +
+          '<option value=""' + (ov.tax ? '' : ' selected') + '>Automatic - taxed unless sold by 6 or 12</option>' +
+          '<option value="on"' + (ov.tax === 'on' ? ' selected' : '') + '>Always taxed</option>' +
+          '<option value="off"' + (ov.tax === 'off' ? ' selected' : '') + '>Never taxed</option>' +
+        '</select></label>' +
       '<div class="mfoot"><button type="button" class="mreset" data-mreset="' + it.id + '">Reset this dish</button>' +
       '<span class="muted">Empty box = the original text or price shown in grey.</span></div>' +
     '</div></details>';
@@ -413,6 +456,23 @@ function renderMenuEditor() {
     if (!bag[key] || typeof bag[key] !== 'object') bag[key] = {};
     if (el.value.trim()) bag[key][lg] = el.value;
     else delete bag[key][lg];
+    pruneMenuOv(id);
+    refreshMenuRow(id);
+    markDirty();
+  }));
+
+  $$('#menuList [data-mstock]').forEach(b => b.addEventListener('click', (e) => {
+    /* le bouton vit dans un <summary> : sans ceci, le clic plierait la ligne */
+    e.preventDefault();
+    e.stopPropagation();
+    setSoldOut(b.dataset.mstock, !isSoldOut(b.dataset.mstock));
+  }));
+
+  $$('#menuList [data-menu-tax]').forEach(el => el.addEventListener('change', () => {
+    const id = el.dataset.menuTax;
+    const bag = menuOv(id, true);
+    if (el.value === 'on' || el.value === 'off') bag.tax = el.value;
+    else delete bag.tax;
     pruneMenuOv(id);
     refreshMenuRow(id);
     markDirty();

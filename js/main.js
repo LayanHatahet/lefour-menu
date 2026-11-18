@@ -721,6 +721,53 @@ function cartSave() {
 function cartCount() { return CART.reduce((a, l) => a + l.qty, 0); }
 function cartTotal() { return CART.reduce((a, l) => a + (l.price || 0) * l.qty, 0); }
 
+/* ── Taxes (Quebec) ───────────────────────────────────────────────
+   Une portion individuelle est taxable ; vendue par six ou par douze,
+   elle ne l est pas. Meme regle que api/checkout.js — si l une des deux
+   change, l autre doit suivre, sinon le panier annonce un total que la
+   caisse ne confirme pas.
+   La TVQ porte sur le prix avant TPS : deux taux sur la meme base. */
+const TPS_RATE = 0.05, TVQ_RATE = 0.09975;
+const UNTAXED_SIZES = { B: true, '12': true };
+
+/* Rupture de stock declaree au tableau de bord. Lue a chaque rendu plutot
+   que figee au chargement : les reglages arrivent apres le premier dessin,
+   et renderMenu() repasse derriere eux. */
+function isOff(id) {
+  const m = window.LF_SETTINGS && window.LF_SETTINGS.menu;
+  return !!(m && m[id] && m[id].off);
+}
+
+function lineTaxable(id, sizeKey) {
+  const ov = (window.LF_SETTINGS && window.LF_SETTINGS.menu && window.LF_SETTINGS.menu[id]) || null;
+  if (ov && ov.tax === 'on') return true;
+  if (ov && ov.tax === 'off') return false;
+  if (UNTAXED_SIZES[sizeKey]) return false;
+  if (catOf(id) === 'minis') return false;
+  return true;
+}
+
+/* Stripe arrondit chaque taxe ligne par ligne, pas sur le total : on fait
+   pareil, sinon l affichage et la page de paiement se separent d une cent. */
+function cartTaxes() {
+  let taxed = 0, tps = 0, tvq = 0;
+  for (const l of CART) {
+    const cents = Math.round((l.price || 0) * 100) * l.qty;
+    if (!cents || !lineTaxable(l.id, l.sizeKey)) continue;
+    taxed += cents;
+    tps += Math.round(cents * TPS_RATE);
+    tvq += Math.round(cents * TVQ_RATE);
+  }
+  const sub = Math.round(cartTotal() * 100);
+  return {
+    taxed: taxed / 100,
+    sub: sub / 100,
+    tps: tps / 100,
+    tvq: tvq / 100,
+    total: (sub + tps + tvq) / 100,
+  };
+}
+
 function catOf(id) {
   for (const c of CATS) if ((MENU[c.key] || []).some(i => i.id === id)) return c.key;
   return 'manakish';
@@ -786,9 +833,17 @@ function cartRender() {
       '<button type="button" data-inc="' + l.key + '" aria-label="plus">+</button>' +
       '</span></div>';
   }).join('');
-  const tot = cartTotal();
+  const tx = cartTaxes();
+  const hasTax = tx.tps > 0 || tx.tvq > 0;
+  const set = (sel, v) => { const el = $(sel); if (el) el.textContent = fmtPrice(v); };
+  set('#cartSub', tx.sub);
+  set('#cartTps', tx.tps);
+  set('#cartTvq', tx.tvq);
+  const taxBox = $('#cartTax'), taxNote = $('#cartTaxNote');
+  if (taxBox) taxBox.hidden = !hasTax;
+  if (taxNote) taxNote.hidden = !hasTax;
   const tEl = $('#cartTotal');
-  if (tEl) tEl.textContent = tot > 0 ? fmtPrice(tot) : '—';
+  if (tEl) tEl.textContent = tx.total > 0 ? fmtPrice(tx.total) : '—';
   $$('#cartList [data-inc]').forEach(b => b.addEventListener('click', () => {
     const l = CART.find(x => x.key === b.dataset.inc); if (l) { l.qty++; cartSave(); }
   }));
@@ -812,7 +867,7 @@ function bindSheetAdd() {
   const b = $('#sheetAdd');
   if (!b) return;
   b.addEventListener('click', () => {
-    if (!SHEET_ITEM) return;
+    if (!SHEET_ITEM || isOff(SHEET_ITEM.id)) return;
     /* le format coche dans la fiche (Regulier, Sandwich, Boite de 6...) */
     const opts = sizeOptions(SHEET_ITEM, SHEET_KIND);
     const o = opts.find(x => x.k === SHEET_SIZE) || opts[0] || null;
@@ -925,6 +980,17 @@ function bindCart() {
           }),
         });
         const j = await r.json().catch(() => ({}));
+        /* La caisse a refuse un plat devenu indisponible depuis que le panier
+           a ete rempli. On retire la ligne et on redessine : le client voit
+           ce qui a saute au lieu d un echec sans explication. */
+        if (r.status === 409 && Array.isArray(j.soldOut) && j.soldOut.length) {
+          CART = CART.filter(l => j.soldOut.indexOf(l.id) === -1);
+          cartSave();
+          alert(t('soldOutCart'));
+          payBtn.disabled = false;
+          label.textContent = original;
+          return;
+        }
         if (!r.ok || !j.url) throw new Error(j.error || 'no session');
         location.assign(j.url);
         return;
@@ -943,7 +1009,7 @@ function bindCart() {
       return '• ' + nm + (sz ? ' (' + sz + ')' : '') + ' × ' + l.qty;
     }).join(NL);
     const note = ($('#cartNote').value || '').trim();
-    const tot = cartTotal();
+    const tot = cartTaxes().total;
     const tpl = CART_TPL[lang] || CART_TPL.fr;
     track('cart_submit', { items: cartCount(), value: tot });
     window.open(waLink(tpl(lines, note, tot > 0 ? fmtPrice(tot) : '')), '_blank', 'noopener');
@@ -982,7 +1048,7 @@ function renderFeatured() {
   for (const c of CATS) {
     for (const it of (MENU[c.key] || [])) {
       const u = PHOTOS.dishes[it.id];
-      if (u) withPhoto.push({ it: it, u: u, kind: c.kind, cat: c.key });
+      if (u && !isOff(it.id)) withPhoto.push({ it: it, u: u, kind: c.kind, cat: c.key });
     }
   }
   if (withPhoto.length < 2) { if (PHOTOS_READY) sec.hidden = true; return; }
@@ -1079,7 +1145,7 @@ function refreshPayEntry() {
   if (!label) return;
   if (cartCount() > 0) {
     label.textContent = t('payReview');
-    if (total) total.textContent = fmtPrice(cartTotal());
+    if (total) total.textContent = fmtPrice(cartTaxes().total);
     if (hint) hint.hidden = true;
   } else {
     label.textContent = t('payCard');
@@ -1241,7 +1307,7 @@ function renderMenu() {
         ${MENU[c.key].map(item => {
           const extra = sizeCount(item, c.kind);
           return `
-          <button type="button" class="card" data-kind="${c.kind}" data-cat="${c.key}" data-id="${item.id}" data-tags="${(item.tags || []).join(',')}">
+          <button type="button" class="card${isOff(item.id) ? ' card--off' : ''}" data-kind="${c.kind}" data-cat="${c.key}" data-id="${item.id}" data-tags="${(item.tags || []).join(',')}">
             <span class="card-art${PHOTOS.dishes[item.id] ? ' card-art--photo' : ''}">${PHOTOS.dishes[item.id] ? `<img src="${imgURL(PHOTOS.dishes[item.id], 128)}"${photoAttrs(PHOTOS.dishes[item.id])} srcset="${imgSet(PHOTOS.dishes[item.id], [128, 256])}" sizes="58px" width="128" height="128" alt="${dishAlt(item)}" loading="lazy" decoding="async">` : inkArt(item, c.kind)}</span>
             <span class="card-mid">
               <span class="card-name">${item.name[lang]}</span>
@@ -1250,7 +1316,9 @@ function renderMenu() {
             </span>
             <span class="card-end">
               ${item.price != null ? `<span class="card-price">${fmtPrice(item.price)}${c.kind === 'mini' ? ' <small>/12</small>' : ''}</span>` : ''}
-              ${extra ? `<span class="card-sizes">+${extra} ${SIZES_HINT[lang][extra > 1 ? 1 : 0]}</span>` : ''}
+              ${isOff(item.id)
+                ? `<span class="card-out">${t('soldOutShort')}</span>`
+                : extra ? `<span class="card-sizes">+${extra} ${SIZES_HINT[lang][extra > 1 ? 1 : 0]}</span>` : ''}
             </span>
           </button>`;
         }).join('')}
@@ -1340,6 +1408,19 @@ function openSheet(item, kind, fromURL) {
   else { box.removeAttribute('role'); box.removeAttribute('aria-labelledby'); }
   box.style.display = opts.length ? '' : 'none';
   paintSizeChoice();
+  /* Le bouton porte le motif au lieu de disparaitre : un bouton absent
+     laisse croire a un bug, un bouton « Non disponible » explique. */
+  const addBtn = $('#sheetAdd');
+  if (addBtn) {
+    const out = isOff(item.id);
+    const lbl = addBtn.querySelector('span');
+    addBtn.disabled = out;
+    addBtn.classList.toggle('is-out', out);
+    addBtn.classList.remove('is-done');
+    if (lbl) lbl.textContent = out ? t('soldOut') : t('addToCart');
+    const ch = $('#sheetAddChoice');
+    if (ch) ch.hidden = out;
+  }
   sheet.classList.add('is-open');
   sheet.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';

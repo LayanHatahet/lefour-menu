@@ -46,7 +46,9 @@ const DEFAULTS = {
   /* menu edited from the dashboard. Only what the owner actually changed is
      stored, keyed by dish id; the site falls back to the menu shipped in
      data.js for anything missing. Shape:
-       { "<dish id>": { price, large, box, name:{fr,en,ar}, desc:{fr,en,ar} } } */
+       { "<dish id>": { price, large, box, name:{fr,en,ar}, desc:{fr,en,ar},
+                        off: true,             rupture de stock
+                        tax: 'on' | 'off' } }  forcer ou retirer TPS/TVQ */
   menu: {},
 };
 
@@ -126,6 +128,16 @@ function cleanMenu(m) {
       }
       if (Object.keys(box).length) item[k] = box;
     }
+    /* Rupture de stock. Le plat reste visible et garde son prix : il est
+       simplement signale indisponible et ne peut plus etre commande, ici
+       comme a la caisse. Seul true est stocke, pour que « remis en vente »
+       efface le champ au lieu d y laisser un false qui trainerait. */
+    if (src.off === true || src.off === 'true' || src.off === 1) item.off = true;
+
+    /* Taxe : rien laisse la regle decider (portion individuelle = taxee,
+       six portions ou plus = non taxee), 'on' et 'off' la forcent. */
+    if (src.tax === 'on' || src.tax === 'off') item.tax = src.tax;
+
     /* a dish with nothing overridden is not stored at all */
     if (Object.keys(item).length) { out[id] = item; n++; }
   }

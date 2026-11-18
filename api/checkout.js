@@ -196,6 +196,9 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         paid: true,
         amount: typeof j.amount_total === 'number' ? j.amount_total / 100 : null,
+        subtotal: typeof j.amount_subtotal === 'number' ? j.amount_subtotal / 100 : null,
+        tax: j.total_details && typeof j.total_details.amount_tax === 'number'
+          ? j.total_details.amount_tax / 100 : null,
         currency: (j.currency || 'cad').toUpperCase(),
         order: (j.metadata && j.metadata.order) || '',
         note: (j.metadata && j.metadata.note) || '',
@@ -228,11 +231,17 @@ module.exports = async (req, res) => {
 
     const line_items = [];
     const summary = [];
+    const soldOut = [];
     let anyTaxed = false;
     for (const raw of cart) {
       const id = String(raw && raw.id || '');
       const base = book.items[id];
       if (!base) continue;
+      /* Rupture de stock declaree au tableau de bord. Le site grise deja le
+         plat, mais un panier garde en memoire avant la rupture arriverait
+         encore ici : on le laisse tomber plutot que d encaisser un plat
+         que la boulangerie ne peut pas servir. */
+      if (book.overrides[id] && book.overrides[id].off) { soldOut.push(id); continue; }
 
       const sizeKey = SIZE_FIELD[raw.size] ? String(raw.size) : 'R';
       const field = SIZE_FIELD[sizeKey];
@@ -263,7 +272,14 @@ module.exports = async (req, res) => {
       summary.push(`${qty}x ${name} (${sizeLabel})`);
     }
 
-    if (!line_items.length) return res.status(400).json({ error: 'nothing payable in this cart' });
+    if (!line_items.length) {
+      return res.status(400).json(soldOut.length
+        ? { error: 'sold out', soldOut: soldOut }
+        : { error: 'nothing payable in this cart' });
+    }
+    /* un panier partiellement servable : on le dit au site, qui previent
+       avant d envoyer le client vers une page de paiement incomplete */
+    if (soldOut.length) return res.status(409).json({ error: 'sold out', soldOut: soldOut });
 
     /* On ne va chercher les taux que s il y a vraiment quelque chose a taxer :
        un panier de boites de 6 n a aucune raison d appeler Stripe pour rien. */

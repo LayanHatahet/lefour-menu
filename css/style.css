@@ -293,6 +293,22 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 }
 [dir="rtl"] .card-sizes { letter-spacing: 0; font-size: .68rem; }
 
+/* ── Rupture de stock ─────────────────────────────────────────────
+   Le plat reste lisible : on l estompe, on barre son prix et on pose
+   l etiquette la ou se trouvent d habitude les formats. Le rendre
+   invisible ferait croire qu il a quitte la carte. */
+.card--off { opacity: .55; }
+.card--off .card-price { text-decoration: line-through; opacity: .65; }
+.card-out {
+  display: inline-block; white-space: nowrap;
+  font-size: .62rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ivory); background: var(--ink); opacity: .75;
+  border-radius: 99px; padding: 3px 8px;
+}
+[dir="rtl"] .card-out { letter-spacing: 0; font-size: .72rem; }
+#sheetAdd.is-out { background: var(--hair); color: var(--ink); opacity: .7; cursor: not-allowed; }
+#sheetAdd.is-out svg { display: none; }
+
 /* ── cover: halal pill + big buttons ───────────── */
 .halal {
   display: inline-flex; align-items: center; gap: 7px;
@@ -952,6 +968,18 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
 .cline-qty i { font-style: normal; min-width: 20px; text-align: center; font-weight: 700; font-size: .92rem; }
 .cart-foot { width: 100%; display: grid; gap: 10px; margin-top: 12px; }
 .cart-note { text-align: start; }
+/* Le detail des taxes se lit comme un recu : discret, aligne sur le total
+   qui le suit, et c est lui qui porte le trait de separation puisqu il
+   vient en premier. */
+.cart-tax {
+  display: grid; gap: 4px;
+  border-top: 1px solid var(--hair); padding-top: 12px;
+  font-size: .78rem;
+}
+.cart-tax p { display: flex; justify-content: space-between; align-items: baseline; opacity: .72; }
+.cart-tax b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cart-tax + .cart-total { border-top: 0; padding-top: 2px; }
+.cart-taxnote { font-size: .7rem; opacity: .5; text-align: start; line-height: 1.45; margin-top: -4px; }
 .cart-total {
   display: flex; justify-content: space-between; align-items: baseline;
   border-top: 1px solid var(--hair); padding-top: 12px;
