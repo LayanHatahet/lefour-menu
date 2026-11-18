@@ -221,8 +221,12 @@ const UI = {
     cartEmpty: 'Your order is empty. Add what you like.',
     cartTotal: 'Total',
     cartSubtotal: 'Subtotal',
-    taxTps: 'GST (5%)',
-    taxTvq: 'QST (9.975%)',
+    /* Les noms quebecois sont gardes tels quels en anglais : c est ainsi
+       qu ils apparaissent sur la page de paiement, sur le recu Stripe et
+       dans le releve mensuel. Traduire ici en GST/QST ferait croire a
+       deux taxes de plus. */
+    taxTps: 'TPS (5%)',
+    taxTvq: 'TVQ (9.975%)',
     taxNote: 'Tax applies to single servings. Boxes of 6 and dozens are not taxed.',
     soldOut: 'Unavailable',
     soldOutShort: 'Sold out',

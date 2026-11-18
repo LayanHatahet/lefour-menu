@@ -417,7 +417,7 @@ function menuRowHtml(it) {
     '<div class="mbody">' +
       '<div class="mprices">' + prices + '</div>' +
       '<div class="grid2">' + texts + '</div>' +
-      '<label class="fld mtax"><span>Taxes (GST 5% + QST 9.975%)</span>' +
+      '<label class="fld mtax"><span>Taxes (TPS 5% + TVQ 9.975%)</span>' +
         '<select data-menu-tax="' + it.id + '">' +
           '<option value=""' + (ov.tax ? '' : ' selected') + '>Automatic - taxed unless sold by 6 or 12</option>' +
           '<option value="on"' + (ov.tax === 'on' ? ' selected' : '') + '>Always taxed</option>' +
@@ -697,8 +697,8 @@ function renderOrderStats() {
   $('#ordStats').innerHTML =
     '<div class="ostat"><b>' + t.count + '</b><span>orders</span></div>' +
     '<div class="ostat"><b>' + money(t.subtotal) + '</b><span>before tax</span></div>' +
-    '<div class="ostat"><b>' + money(t.tps) + '</b><span>GST collected</span></div>' +
-    '<div class="ostat"><b>' + money(t.tvq) + '</b><span>QST collected</span></div>' +
+    '<div class="ostat"><b>' + money(t.tps) + '</b><span>TPS collected</span></div>' +
+    '<div class="ostat"><b>' + money(t.tvq) + '</b><span>TVQ collected</span></div>' +
     '<div class="ostat ostat--big"><b>' + money(t.total) + '</b><span>taken in</span></div>';
 }
 
@@ -756,7 +756,7 @@ function orderCard(o) {
     '<ul class="oitems">' + items + '</ul>' +
     (o.note ? '<p class="onote">“' + esc(o.note) + '”</p>' : '') +
     '<footer>' +
-      (tax > 0 ? '<span>GST ' + money(o.tps) + ' · QST ' + money(o.tvq) + '</span>' : '<span>no tax</span>') +
+      (tax > 0 ? '<span>TPS ' + money(o.tps) + ' · TVQ ' + money(o.tvq) + '</span>' : '<span>no tax</span>') +
       '<b>' + money(o.total) + '</b>' +
     '</footer></article>';
 }
