@@ -219,13 +219,17 @@ module.exports = async (req, res) => {
 
     /* L historique personnel se remplit des maintenant, compte ou pas :
        quand la personne en creera un avec la meme adresse, ses commandes
-       passees seront deja la, prêtes a etre recommandees. Un echec ici ne
-       doit pas faire reessayer tout le webhook : la commande, elle, est
-       bien enregistree. */
-    if (added) {
-      try { await ORDERS.noteCustomerOrder(order); }
-      catch (e) { console.error('customer history not updated:', e && e.message); }
-    }
+       passees seront deja la, prêtes a etre recommandees.
+
+       Volontairement hors du `if (added)` : une livraison rejouee par Stripe
+       arrive avec added=false, et c est justement le cas ou l historique
+       avait pu etre saute au tour precedent. noteCustomerOrder ignore une
+       commande deja presente, donc le repasser ne coute rien.
+
+       Un echec ici ne doit pas faire reessayer tout le webhook : la
+       commande, elle, est bien enregistree. */
+    try { await ORDERS.noteCustomerOrder(order); }
+    catch (e) { console.error('customer history not updated:', e && e.message); }
 
     if (added && order.receipt && order.email && session.payment_intent) {
       await sendReceipt(String(session.payment_intent), order.email);

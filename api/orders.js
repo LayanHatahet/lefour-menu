@@ -109,7 +109,7 @@ module.exports = async (req, res) => {
 
   try {
     if (!month) {
-      const months = await ORDERS.readIndex();
+      const months = await ORDERS.monthsAvailable(12);
       return res.status(200).json({ months });
     }
     if (!ORDERS.MONTH_RE.test(month)) return res.status(400).json({ error: 'bad month' });

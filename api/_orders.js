@@ -142,23 +142,37 @@ async function noteMonth(month) {
 
 /* Ajout idempotent. La meme session peut arriver deux fois — Stripe reessaie
    un webhook qui n a pas repondu 200 — et elle ne doit creer qu une ligne.
-   Apres l ecriture on relit pour verifier que la ligne est bien la : deux
-   paiements a la meme seconde pourraient sinon s ecraser l un l autre. */
+
+   La relecture ne sert qu a rattraper le cas ou deux paiements arrivent a la
+   meme seconde et s ecrasent. Elle ne peut PAS servir de preuve : le Blob se
+   lit derriere un cache, et une relecture qui ne voit pas encore la ligne ne
+   veut pas dire que l ecriture a echoue. C est ce qui s est passe le
+   19 novembre — writeMonth avait reussi trois fois, la relecture ne montrait
+   rien, on levait une erreur, Stripe recevait un 500 et reessayait ; au
+   deuxieme passage la commande etait bien la, donc traitee comme un doublon
+   et le reste de la chaine (historique client, recu) etait saute.
+
+   C est writeMonth qui dit la verite : s il n a pas leve, l ecriture est
+   partie. On ne leve donc plus ici. */
 async function addOrder(order) {
   const month = order.month;
   for (let attempt = 0; attempt < 3; attempt++) {
     const book = await readMonth(month);
-    if (book.orders.some(o => o.id === order.id)) return { added: false };
+    if (book.orders.some(o => o.id === order.id)) {
+      /* deja enregistree : on repasse quand meme par l index, qui a pu
+         manquer son tour lors du passage precedent */
+      await noteMonth(month);
+      return { added: false };
+    }
     const next = book.orders.concat([order]);
     next.sort((a, b) => String(a.paidAt).localeCompare(String(b.paidAt)));
     await writeMonth(month, next);
+    await noteMonth(month);
     const check = await readMonth(month);
-    if (check.orders.some(o => o.id === order.id)) {
-      await noteMonth(month);
-      return { added: true };
-    }
+    if (check.orders.some(o => o.id === order.id)) return { added: true };
   }
-  throw new Error('order not persisted');
+  console.warn('order', order.id, 'written but not confirmed by a read-back');
+  return { added: true, verified: false };
 }
 
 /* ── Clients ──────────────────────────────────────────────────────────
@@ -224,8 +238,35 @@ async function noteCustomerOrder(order) {
   await writeCustomer(order.email, rec);
 }
 
+/* Les mois a proposer au tableau de bord.
+
+   L index reste la voie rapide, mais il n est plus cru sur parole : il
+   s etait retrouve vide alors que novembre contenait deux commandes, et
+   le mois aurait disparu du menu deroulant des decembre venu. On sonde
+   donc aussi les douze derniers mois, un par un. Ce sont de simples
+   requetes CDN sur des adresses connues — toujours pas de list(), qui
+   reste l operation a ne jamais faire ici. */
+async function monthsAvailable(back) {
+  const seen = new Set(await readIndex().catch(() => []));
+  const now = new Date();
+  const probes = [];
+  for (let i = 0; i < (back || 12); i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 15));
+    probes.push(monthOf(d));
+  }
+  const found = await Promise.all(probes.map(async (m) => {
+    if (seen.has(m)) return m;
+    try {
+      const book = await readMonth(m);
+      return (book.orders && book.orders.length) ? m : null;
+    } catch (e) { return null; }
+  }));
+  for (const m of found) if (m) seen.add(m);
+  return [...seen].filter(m => MONTH_RE.test(m)).sort().reverse();
+}
+
 module.exports = {
   MONTH_RE, monthOf, dayOf, clockOf, montrealParts,
-  readMonth, writeMonth, addOrder, readIndex, noteMonth, token,
+  readMonth, writeMonth, addOrder, readIndex, noteMonth, monthsAvailable, token,
   customerKey, readCustomer, writeCustomer, noteCustomerOrder,
 };
