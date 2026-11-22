@@ -12,6 +12,7 @@
 const BLOB = 'https://blob.vercel-storage.com';
 const V = '7';
 const PATH = 'config/settings.json';
+const STOCK_PATH = 'config/stock.json';
 /* the store's public address, e.g. https://abc123.public.blob.vercel-storage.com.
    Vercel's read-write token carries the store id (vercel_blob_rw_<storeId>_<secret>);
    BLOB_PUBLIC_BASE overrides it if that ever changes. */
@@ -22,6 +23,16 @@ const FALLBACK_ADMIN = 'lefour2026';
 
 function token() { return process.env.BLOB_READ_WRITE_TOKEN || ''; }
 function adminKey() { return process.env.ADMIN_PASSWORD || FALLBACK_ADMIN; }
+
+/* La liste des plats epuises, ecrite en entier par /api/stock. Absente ou
+   illisible = rien n est epuise : mieux vaut proposer un plat qui vient de
+   partir que masquer toute la carte sur une panne de lecture. */
+async function readStock(resp) {
+  if (!resp || !resp.ok) return [];
+  const j = await resp.json().catch(() => null);
+  const list = j && Array.isArray(j.off) ? j.off : [];
+  return list.filter(id => typeof id === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/i.test(id));
+}
 
 const DEFAULTS = {
   ga4: '',
@@ -47,8 +58,8 @@ const DEFAULTS = {
      stored, keyed by dish id; the site falls back to the menu shipped in
      data.js for anything missing. Shape:
        { "<dish id>": { price, large, box, name:{fr,en,ar}, desc:{fr,en,ar},
-                        off: true,             rupture de stock
-                        tax: 'on' | 'off' } }  forcer ou retirer TPS/TVQ */
+                        tax: 'on' | 'off' } }  forcer ou retirer TPS/TVQ
+     La rupture de stock n est pas ici : voir config/stock.json. */
   menu: {},
 };
 
@@ -128,11 +139,10 @@ function cleanMenu(m) {
       }
       if (Object.keys(box).length) item[k] = box;
     }
-    /* Rupture de stock. Le plat reste visible et garde son prix : il est
-       simplement signale indisponible et ne peut plus etre commande, ici
-       comme a la caisse. Seul true est stocke, pour que « remis en vente »
-       efface le champ au lieu d y laisser un false qui trainerait. */
-    if (src.off === true || src.off === 'true' || src.off === 1) item.off = true;
+    /* `off` n est volontairement PAS lu ici : la rupture de stock vit dans
+       config/stock.json, ecrit en entier par /api/stock. Si on l acceptait
+       aussi dans les reglages, « Save changes » republierait un etat vieux
+       de plusieurs minutes et remettrait en vente un plat epuise. */
 
     /* Taxe : rien laisse la regle decider (portion individuelle = taxee,
        six portions ou plus = non taxee), 'on' et 'off' la forcent. */
@@ -171,13 +181,24 @@ module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
       const fresh = !!(req.query && req.query.fresh);
-      const r = await fetch(`${PUBLIC}/${PATH}${fresh ? `?v=${Date.now()}` : ''}`);
+      /* les deux fichiers en parallele : la rupture a le sien pour que
+         l un ne puisse jamais ecraser l autre */
+      const [r, sr] = await Promise.all([
+        fetch(`${PUBLIC}/${PATH}${fresh ? `?v=${Date.now()}` : ''}`),
+        fetch(`${PUBLIC}/${STOCK_PATH}?v=${Date.now()}`).catch(() => null),
+      ]);
       if (r.ok) {
         const saved = await r.json().catch(() => ({}));
         const out = merge(DEFAULTS, saved);
         out.hours = cleanHours(out.hours);
         out.menu = cleanMenu(out.menu);
         out.pos = cleanPos(out.pos);
+        out.stock = await readStock(sr);
+        /* le site lit menu[id].off : on le compose ici plutot que de lui
+           faire connaitre deux sources */
+        for (const id of out.stock) {
+          out.menu[id] = Object.assign({}, out.menu[id], { off: true });
+        }
         res.setHeader('cache-control', fresh ? 'no-store' : 'public, max-age=0, s-maxage=15');
         return res.status(200).json({ settings: out, configured: true });
       }
@@ -187,14 +208,21 @@ module.exports = async (req, res) => {
       /* Only "this file does not exist" means "nothing saved yet". Any other
          failure must NOT answer with empty defaults: the dashboard would show
          blank fields and a Save would erase what the owner saved before. */
-      if (r.status === 404 && !blocked) return res.status(200).json({ settings: DEFAULTS, configured: true });
+      if (r.status === 404 && !blocked) {
+        const empty = Object.assign({}, DEFAULTS, { stock: [], menu: {} });
+        for (const id of await readStock(sr)) empty.menu[id] = { off: true };
+        empty.stock = await readStock(sr);
+        return res.status(200).json({ settings: empty, configured: true });
+      }
       return res.status(503).json({ error: blocked ? 'storage blocked' : 'settings unavailable', blocked });
     }
 
     if (req.method === 'POST') {
       res.setHeader('cache-control', 'no-store');
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-      const clean = merge(DEFAULTS, body.settings || {});
+      const incoming = Object.assign({}, body.settings || {});
+      delete incoming.stock;           /* appartient a /api/stock */
+      const clean = merge(DEFAULTS, incoming);
       clean.hours = cleanHours(clean.hours);
       clean.menu = cleanMenu(clean.menu);
       clean.pos = cleanPos(clean.pos);

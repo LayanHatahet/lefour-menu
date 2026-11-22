@@ -1,24 +1,30 @@
-/* POST /api/stock  (admin)  -> { ok: true, off: true|false }
-   body: { id: "<dish id>", off: true|false }
+/* POST /api/stock  (admin)  -> { ok: true, off: [...] }
+   body: { off: ["<dish id>", ...] }   LA LISTE COMPLETE des plats epuises
 
-   Rupture de stock, en un geste. Volontairement separe de /api/settings :
-   le tableau de bord garde des modifications non publiees (prix en cours de
-   saisie, textes a moitie ecrits), et marquer un plat epuise pendant le coup
-   de feu ne doit surtout pas publier ce brouillon au passage. Cette fonction
-   relit le fichier enregistre, ne touche qu un seul champ et le reecrit.    */
+   Pourquoi la liste entiere et pas « ce plat, epuise » :
+
+   La premiere version faisait un lire-modifier-reecrire sur les reglages.
+   Le Blob se lit par son adresse publique, derriere un cache : deux
+   changements rapproches et le second repartait d une copie d avant le
+   premier, qu il reecrivait par-dessus. Un plat remis en vente revenait
+   tout seul en rupture, un plat mis en rupture ne l etait jamais — sans
+   le moindre message d erreur. Le tableau de bord, lui, sait exactement
+   quels plats sont epuises : qu il envoie la liste complete, et il n y a
+   plus rien a relire, donc plus rien a perdre.
+
+   La rupture vit dans son propre fichier, pas dans les reglages : « Save
+   changes » ne peut donc plus la ressusciter ni l effacer au passage.   */
 
 const BLOB = 'https://blob.vercel-storage.com';
 const V = '7';
-const PATH = 'config/settings.json';
-
-const PUBLIC = (process.env.BLOB_PUBLIC_BASE
-  || `https://${String((process.env.BLOB_READ_WRITE_TOKEN || '').split('_')[3] || '').toLowerCase()}.public.blob.vercel-storage.com`).replace(/\/+$/, '');
+const PATH = 'config/stock.json';
 
 const FALLBACK_ADMIN = 'lefour2026';
 function token() { return process.env.BLOB_READ_WRITE_TOKEN || ''; }
 function adminKey() { return process.env.ADMIN_PASSWORD || FALLBACK_ADMIN; }
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/i;
+const MAX_OFF = 300;
 
 module.exports = async (req, res) => {
   res.setHeader('cache-control', 'no-store');
@@ -34,32 +40,14 @@ module.exports = async (req, res) => {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const id = String(body.id || '');
-    if (!ID_RE.test(id)) return res.status(400).json({ error: 'bad dish id' });
-    const off = body.off === true || body.off === 'true';
+    if (!Array.isArray(body.off)) return res.status(400).json({ error: 'off must be a list of dish ids' });
 
-    /* On lit la version enregistree, jamais celle qui traine dans l onglet :
-       deux personnes peuvent avoir le tableau de bord ouvert en meme temps. */
-    const r = await fetch(`${PUBLIC}/${PATH}?v=${Date.now()}`);
-    let saved = {};
-    if (r.ok) {
-      saved = await r.json().catch(() => ({}));
-    } else {
-      const text = await r.text().catch(() => '');
-      if (/store is blocked/i.test(text)) return res.status(503).json({ error: 'storage blocked', blocked: true });
-      /* 404 = rien n a encore ete enregistre, on part d une page blanche ;
-         toute autre panne doit s arreter ici plutot que d ecraser le fichier */
-      if (r.status !== 404) return res.status(503).json({ error: 'settings unavailable' });
+    const seen = new Set();
+    for (const raw of body.off.slice(0, MAX_OFF)) {
+      const id = String(raw || '');
+      if (ID_RE.test(id)) seen.add(id);
     }
-    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) saved = {};
-    if (!saved.menu || typeof saved.menu !== 'object' || Array.isArray(saved.menu)) saved.menu = {};
-    if (!saved.menu[id] || typeof saved.menu[id] !== 'object') saved.menu[id] = {};
-
-    if (off) saved.menu[id].off = true;
-    else delete saved.menu[id].off;
-    /* un plat remis en vente qui n a aucune autre modification redevient
-       un plat ordinaire : on ne laisse pas une coquille vide derriere */
-    if (!Object.keys(saved.menu[id]).length) delete saved.menu[id];
+    const off = [...seen].sort();
 
     const put = await fetch(`${BLOB}/${PATH}`, {
       method: 'PUT',
@@ -69,16 +57,18 @@ module.exports = async (req, res) => {
         'x-content-type': 'application/json',
         'x-add-random-suffix': '0',
         'x-allow-overwrite': '1',
-        'x-cache-control-max-age': '60',
+        /* court : une rupture declaree pendant le service doit se voir tout
+           de suite, et ce fichier ne pese que quelques octets */
+        'x-cache-control-max-age': '10',
       },
-      body: JSON.stringify(saved),
+      body: JSON.stringify({ off, updated: new Date().toISOString() }),
     });
     if (!put.ok) {
       const t = await put.text().catch(() => '');
       if (/store is blocked/i.test(t)) return res.status(503).json({ error: 'storage blocked', blocked: true });
       return res.status(502).json({ error: 'could not save' });
     }
-    return res.status(200).json({ ok: true, id: id, off: off });
+    return res.status(200).json({ ok: true, off });
   } catch (e) {
     console.error('stock failed:', e && e.message);
     return res.status(500).json({ error: 'stock update failed' });

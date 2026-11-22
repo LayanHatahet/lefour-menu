@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Le Four — Orders &amp; monthly report</title>
+  <link rel="icon" type="image/png" href="assets/logo_rollpin.png">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Manrope:wght@300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+  <header class="ah">
+    <img src="assets/logo_wordmark.png" alt="Le Four">
+    <span class="ah-tag">Orders &amp; report</span>
+    <button id="logout" class="mini" hidden>Log out</button>
+  </header>
+
+  <!-- gate : mot de passe propre a cette page, separe du tableau de bord -->
+  <section class="gate" id="gate">
+    <h1>Orders &amp; monthly report</h1>
+    <p class="muted">This page shows what customers paid and how to reach them. It has its own password, separate from the photo dashboard.</p>
+    <form id="gateForm">
+      <input type="password" id="pw" autocomplete="current-password" placeholder="Reports password" required>
+      <button type="submit" class="solid">Enter</button>
+    </form>
+    <p class="err" id="gateErr" hidden></p>
+  </section>
+
+  <main id="app" hidden>
+    <section class="block">
+      <h2>Orders</h2>
+      <p class="muted">Every order paid by card on the website, month by month. Orders that came in over WhatsApp or at the counter are not here &mdash; only what the website took payment for.</p>
+
+      <div class="obar">
+        <label class="fld ofld"><span>Month</span><select id="ordMonth"></select></label>
+        <button class="mini" type="button" id="ordRefresh">Refresh</button>
+        <button class="mini mini--go" type="button" id="ordXlsx">Download Excel</button>
+      </div>
+
+      <div class="ostats" id="ordStats"></div>
+      <div class="ocal" id="ordCal"></div>
+      <p class="muted ofilter" id="ordFilter" hidden></p>
+      <div class="olist" id="ordList"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="js/reports.js"></script>
+</body>
+</html>

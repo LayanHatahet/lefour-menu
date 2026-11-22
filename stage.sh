@@ -17,7 +17,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 
 # the site itself
-cp "$HERE/index.html" "$HERE/admin.html" "$HERE/merci.html" "$HERE/commande-annulee.html" "$OUT/"
+cp "$HERE/index.html" "$HERE/admin.html" "$HERE/reports.html" "$HERE/merci.html" "$HERE/commande-annulee.html" "$OUT/"
 cp -r "$HERE/css" "$HERE/js" "$HERE/assets" "$OUT/"
 
 # functions + routing come from the payload, never from the repo copies

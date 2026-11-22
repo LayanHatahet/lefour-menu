@@ -722,13 +722,19 @@ function cartCount() { return CART.reduce((a, l) => a + l.qty, 0); }
 function cartTotal() { return CART.reduce((a, l) => a + (l.price || 0) * l.qty, 0); }
 
 /* ── Taxes (Quebec) ───────────────────────────────────────────────
-   Une portion individuelle est taxable ; vendue par six ou par douze,
-   elle ne l est pas. Meme regle que api/checkout.js — si l une des deux
-   change, l autre doit suivre, sinon le panier annonce un total que la
-   caisse ne confirme pas.
+   Boite de 6 et douzaine : jamais de taxe.
+   Sandwich : toujours taxe, quelle que soit la quantite.
+   Manouche reguliere : taxee tant qu il y en a moins de six DANS LA
+   COMMANDE — une zaatar plus cinq fromages font six, donc aucune taxe.
+   Le reste (pizzas, mezze, boissons) : taxe.
+
+   Meme regle que api/checkout.js — si l une des deux change, l autre
+   doit suivre, sinon le panier annonce un total que la caisse ne
+   confirme pas.
    La TVQ porte sur le prix avant TPS : deux taux sur la meme base. */
 const TPS_RATE = 0.05, TVQ_RATE = 0.09975;
 const UNTAXED_SIZES = { B: true, '12': true };
+const BULK_REGULARS = 6;
 
 /* Rupture de stock declaree au tableau de bord. Lue a chaque rendu plutot
    que figee au chargement : les reglages arrivent apres le premier dessin,
@@ -738,22 +744,38 @@ function isOff(id) {
   return !!(m && m[id] && m[id].off);
 }
 
-function lineTaxable(id, sizeKey) {
+/* combien de manouches regulieres dans le panier, tous plats confondus */
+function regularCount() {
+  let n = 0;
+  for (const l of CART) {
+    if ((l.sizeKey || 'R') !== 'R') continue;
+    if (catOf(l.id) !== 'manakish') continue;
+    n += l.qty;
+  }
+  return n;
+}
+
+function lineTaxable(id, sizeKey, bulk) {
   const ov = (window.LF_SETTINGS && window.LF_SETTINGS.menu && window.LF_SETTINGS.menu[id]) || null;
   if (ov && ov.tax === 'on') return true;
   if (ov && ov.tax === 'off') return false;
   if (UNTAXED_SIZES[sizeKey]) return false;
-  if (catOf(id) === 'minis') return false;
+  const cat = catOf(id);
+  if (cat === 'minis') return false;
+  if (sizeKey === 'L') return true;
+  if (cat === 'manakish' && sizeKey === 'R') return !bulk;
   return true;
 }
 
 /* Stripe arrondit chaque taxe ligne par ligne, pas sur le total : on fait
    pareil, sinon l affichage et la page de paiement se separent d une cent. */
 function cartTaxes() {
+  const regulars = regularCount();
+  const bulk = regulars >= BULK_REGULARS;
   let taxed = 0, tps = 0, tvq = 0;
   for (const l of CART) {
     const cents = Math.round((l.price || 0) * 100) * l.qty;
-    if (!cents || !lineTaxable(l.id, l.sizeKey)) continue;
+    if (!cents || !lineTaxable(l.id, l.sizeKey, bulk)) continue;
     taxed += cents;
     tps += Math.round(cents * TPS_RATE);
     tvq += Math.round(cents * TVQ_RATE);
@@ -765,6 +787,8 @@ function cartTaxes() {
     tps: tps / 100,
     tvq: tvq / 100,
     total: (sub + tps + tvq) / 100,
+    regulars: regulars,
+    bulk: bulk,
   };
 }
 
@@ -841,7 +865,19 @@ function cartRender() {
   set('#cartTvq', tx.tvq);
   const taxBox = $('#cartTax'), taxNote = $('#cartTaxNote');
   if (taxBox) taxBox.hidden = !hasTax;
-  if (taxNote) taxNote.hidden = !hasTax;
+  if (taxNote) {
+    taxNote.hidden = !hasTax && !tx.bulk;
+    /* A une ou deux manouches pres du seuil, le dire vaut mieux que de
+       laisser le client payer une taxe qu il pouvait eviter. */
+    const left = BULK_REGULARS - tx.regulars;
+    if (hasTax && tx.regulars > 0 && left > 0) {
+      taxNote.textContent = t('taxAlmost').replace('{n}', String(left));
+    } else if (tx.bulk) {
+      taxNote.textContent = t('taxFree6');
+    } else {
+      taxNote.textContent = t('taxNote');
+    }
+  }
   const tEl = $('#cartTotal');
   if (tEl) tEl.textContent = tx.total > 0 ? fmtPrice(tx.total) : '—';
   $$('#cartList [data-inc]').forEach(b => b.addEventListener('click', () => {

@@ -18,10 +18,23 @@ const STRIPE_BASE = 'https://api.stripe.com/v1';
 const STRIPE_API = `${STRIPE_BASE}/checkout/sessions`;
 
 /* ── Taxes (Quebec) ─────────────────────────────────────────────────
-   Un repas prepare est taxable, sauf vendu par six portions ou plus :
-   les boites de 6 et les douzaines de bouchees passent alors comme
-   epicerie de base et ne portent aucune taxe. C est la regle que le
-   client a donnee, et c est aussi celle de Revenu Quebec.
+   Regle donnee par le client, qui est aussi celle de Revenu Quebec sur
+   les produits de boulangerie :
+
+     Boite de 6, douzaine de bouchees : jamais de taxe.
+     Sandwich (format L)              : toujours taxe, quelle que soit
+                                        la quantite — c est un repas
+                                        prepare, pas de l epicerie.
+     Manouche reguliere               : taxee tant qu il y en a MOINS DE
+                                        SIX dans la commande. A partir de
+                                        six, plus aucune taxe dessus.
+     Le reste (pizzas, mezze, boissons) : taxe.
+
+   Le compte des six porte sur LA COMMANDE, pas sur le plat : une zaatar
+   plus cinq fromages font six regulieres, donc aucune taxe. Cinq seulement
+   et tout est taxe. C est pour cela que la taxe ne peut pas se decider
+   ligne par ligne : il faut d abord avoir lu tout le panier.
+
    La TVQ se calcule sur le prix avant TPS, pas l une sur l autre :
    deux taux exclusifs appliques a la meme base, jamais composes. */
 const TAX_SPECS = [
@@ -34,15 +47,31 @@ const TAX_SPECS = [
 /* B = boite de 6, 12 = douzaine de bouchees : six portions ou plus. */
 const UNTAXED_SIZES = { B: true, '12': true };
 
-/* Le tableau de bord peut forcer le resultat plat par plat :
+/* Le seuil des manouches regulieres. */
+const BULK_REGULARS = 6;
+
+/* `bulk` = la commande contient six manouches regulieres ou plus.
+   Le tableau de bord peut forcer le resultat plat par plat :
    '' ou absent = la regle, 'on' = toujours taxe, 'off' = jamais. */
-function lineTaxable(cat, sizeKey, ov) {
+function lineTaxable(cat, sizeKey, ov, bulk) {
   const forced = ov && typeof ov.tax === 'string' ? ov.tax : '';
   if (forced === 'on') return true;
   if (forced === 'off') return false;
   if (UNTAXED_SIZES[sizeKey]) return false;
   if (cat === 'minis') return false;
+  if (sizeKey === 'L') return true;
+  if (cat === 'manakish' && sizeKey === 'R') return !bulk;
   return true;
+}
+
+/* Les manouches regulieres reellement facturees — un plat epuise a ete
+   ecarte plus haut et ne doit pas compter dans les six. */
+function countRegulars(lines) {
+  let n = 0;
+  for (const li of lines) {
+    if (li.meta.cat === 'manakish' && li.meta.sizeKey === 'R') n += li.quantity;
+  }
+  return n;
 }
 
 function stripeHeaders() {
@@ -263,7 +292,6 @@ module.exports = async (req, res) => {
     const summary = [];
     const soldOut = [];
     const compact = [];
-    let anyTaxed = false;
     for (const raw of cart) {
       const id = String(raw && raw.id || '');
       const base = book.items[id];
@@ -289,11 +317,11 @@ module.exports = async (req, res) => {
         ? name
         : `${name} — ${sizeLabel}`;
 
-      const taxed = lineTaxable(base.cat, sizeKey, book.overrides[id]);
-      if (taxed) anyTaxed = true;
       line_items.push({
         quantity: qty,
-        taxed: taxed,                        /* retire avant l envoi a Stripe */
+        /* de quoi trancher une fois tout le panier lu ; retire avant
+           l envoi a Stripe */
+        meta: { cat: base.cat, sizeKey: sizeKey, ov: book.overrides[id] },
         price_data: {
           currency: book.currency,
           unit_amount: Math.round(unit * 100),
@@ -316,13 +344,18 @@ module.exports = async (req, res) => {
        avant d envoyer le client vers une page de paiement incomplete */
     if (soldOut.length) return res.status(409).json({ error: 'sold out', soldOut: soldOut });
 
+    /* Maintenant seulement : le panier est connu, donc le seuil des six
+       manouches regulieres aussi. */
+    const bulk = countRegulars(line_items) >= BULK_REGULARS;
+    const taxable = line_items.map(li => lineTaxable(li.meta.cat, li.meta.sizeKey, li.meta.ov, bulk));
+
     /* On ne va chercher les taux que s il y a vraiment quelque chose a taxer :
        un panier de boites de 6 n a aucune raison d appeler Stripe pour rien. */
-    const rates = anyTaxed ? await taxRateIds() : null;
-    for (const li of line_items) {
-      if (li.taxed && rates) li.tax_rates = rates;
-      delete li.taxed;
-    }
+    const rates = taxable.some(Boolean) ? await taxRateIds() : null;
+    line_items.forEach((li, i) => {
+      if (taxable[i] && rates) li.tax_rates = rates;
+      delete li.meta;
+    });
 
     const note = String(body.note || '').trim().slice(0, 450);
     const payload = {

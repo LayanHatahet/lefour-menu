@@ -32,10 +32,12 @@
   <main id="app" hidden>
     <div class="notice" id="notice" hidden></div>
 
+    <p class="muted areports">Orders and the monthly report have their own page,
+      with its own password: <a href="/rapports">/rapports</a>.</p>
+
     <nav class="tabs" id="adminTabs">
       <button class="atab is-on" data-tab="photos">Photos</button>
       <button class="atab" data-tab="menu">Menu &amp; prices</button>
-      <button class="atab" data-tab="orders">Orders</button>
       <button class="atab" data-tab="seo">SEO</button>
       <button class="atab" data-tab="analytics">Analytics</button>
       <button class="atab" data-tab="business">Business &amp; social</button>
@@ -46,24 +48,6 @@
         <h2>Menu &amp; prices</h2>
         <p class="muted">Change a price or the wording of any dish. An empty box keeps what the site ships with &mdash; shown in grey inside the box. A price box showing <b>&mdash;</b> means that size is not offered; type a price to start offering it. Dishes cannot be added or removed here.</p>
         <div id="menuList"></div>
-      </section>
-    </div>
-
-    <div class="pane" id="pane-orders" hidden>
-      <section class="block">
-        <h2>Orders</h2>
-        <p class="muted">Every order paid by card on the website, month by month. Orders that came in over WhatsApp or at the counter are not here &mdash; only what the website took payment for.</p>
-
-        <div class="obar">
-          <label class="fld ofld"><span>Month</span><select id="ordMonth"></select></label>
-          <button class="mini" type="button" id="ordRefresh">Refresh</button>
-          <button class="mini mini--go" type="button" id="ordXlsx">Download Excel</button>
-        </div>
-
-        <div class="ostats" id="ordStats"></div>
-        <div class="ocal" id="ordCal"></div>
-        <p class="muted ofilter" id="ordFilter" hidden></p>
-        <div class="olist" id="ordList"></div>
       </section>
     </div>
 

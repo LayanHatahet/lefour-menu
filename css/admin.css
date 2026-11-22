@@ -217,6 +217,9 @@ body.is-paused .gal button,body.is-paused #saveBar{pointer-events:none;opacity:.
 }
 
 
+.areports { margin: 0 0 14px; }
+.areports a { color: #46522A; }
+
 /* ══════════ COMMANDES ═══════════════════════════════════════════════ */
 
 .obar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 14px 0 18px; }

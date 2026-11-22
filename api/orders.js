@@ -8,8 +8,12 @@
 const ORDERS = require('./_orders.js');
 const XLSX = require('./_xlsx.js');
 
-const FALLBACK_ADMIN = 'lefour2026';
-function adminKey() { return process.env.ADMIN_PASSWORD || FALLBACK_ADMIN; }
+/* Ces lignes portent le nom, le courriel et le telephone de vrais clients.
+   Elles ne partagent donc pas le mot de passe du tableau de bord photos,
+   qui sert aussi au personnel — et qui, lui, a une valeur de repli ecrite
+   dans un depot public. Ici il n y en a AUCUNE : sans REPORTS_PASSWORD
+   pose sur Vercel, la page refuse de servir quoi que ce soit. */
+function reportsKey() { return process.env.REPORTS_PASSWORD || ''; }
 
 const MONTH_NAMES = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
   'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -91,7 +95,11 @@ module.exports = async (req, res) => {
     res.setHeader('allow', 'GET');
     return res.status(405).json({ error: 'method not allowed' });
   }
-  if ((req.headers['x-admin-key'] || '') !== adminKey()) {
+  const want = reportsKey();
+  if (!want) {
+    return res.status(503).json({ error: 'reports password not configured' });
+  }
+  if ((req.headers['x-reports-key'] || '') !== want) {
     return res.status(401).json({ error: 'unauthorized' });
   }
   if (!ORDERS.token()) return res.status(503).json({ error: 'BLOB_READ_WRITE_TOKEN not set' });
