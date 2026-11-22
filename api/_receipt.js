@@ -49,6 +49,21 @@ async function putReceiptEmail(paymentIntentId, email) {
   return { ok: false, error: last };
 }
 
+/* Stripe garde receipt_email sur le paiement : s il y est deja, le recu
+   est parti. C est ce qui permet de rattraper les commandes d avant le
+   suivi sans envoyer un deuxieme exemplaire a quelqu un qui l a deja. */
+async function alreadySent(paymentIntentId) {
+  if (!stripeKey() || !paymentIntentId) return null;
+  try {
+    const r = await fetch(`${STRIPE_BASE}/payment_intents/${encodeURIComponent(paymentIntentId)}`, {
+      headers: { authorization: `Bearer ${stripeKey()}` },
+    });
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => null);
+    return j && j.receipt_email ? String(j.receipt_email) : '';
+  } catch (e) { return null; }
+}
+
 /* Renvoie ce qu il faut inscrire sur la commande. */
 async function sendReceipt(paymentIntentId, email) {
   if (!stripeKey()) return { receiptSent: false, receiptError: 'STRIPE_SECRET_KEY not set' };
@@ -60,4 +75,4 @@ async function sendReceipt(paymentIntentId, email) {
   return { receiptSent: false, receiptError: r.error || 'unknown error' };
 }
 
-module.exports = { sendReceipt };
+module.exports = { sendReceipt, alreadySent };

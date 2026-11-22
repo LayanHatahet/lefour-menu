@@ -86,8 +86,9 @@ function toRows(orders) {
     tvq: o.tvq,
     total: o.total,
     receipt: !o.receipt ? 'Non demandé'
-      : o.receiptSent ? 'Envoyé'
-      : 'DEMANDÉ — non envoyé',
+      : o.receiptSent === true ? 'Envoyé'
+      : o.receiptSent === false ? 'DEMANDÉ — non envoyé'
+      : 'Demandé — état inconnu',
     lang: (o.lang || '').toUpperCase(),
     mode: o.mode || '',
   }));
@@ -139,6 +140,17 @@ module.exports = async (req, res) => {
         const j = await r.json().catch(() => ({}));
         pi = j && j.payment_intent ? String(j.payment_intent) : '';
       }
+      /* Deja parti ? Alors on se contente de l inscrire. Les commandes
+         d avant le suivi affichent « etat inconnu », et ce bouton doit
+         pouvoir lever le doute sans faire un doublon. */
+      const seen = await RECEIPT.alreadySent(pi);
+      if (seen && order.email && seen.toLowerCase() === String(order.email).toLowerCase()) {
+        await ORDERS.patchOrder(m, id, {
+          pi: pi, receiptSent: true, receiptAt: order.receiptAt || '', receiptError: '',
+        });
+        return res.status(200).json({ ok: true, sentTo: order.email, already: true });
+      }
+
       const out = await RECEIPT.sendReceipt(pi, order.email);
       await ORDERS.patchOrder(m, id, {
         pi: pi || order.pi || '',

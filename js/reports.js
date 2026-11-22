@@ -52,9 +52,13 @@ async function api(path, opts) {
    cas ou la boulangerie a quelque chose a faire. */
 function receiptBadge(o) {
   if (!o.receipt) return '';
-  if (o.receiptSent) return '<span class="otag">receipt sent</span>';
-  return '<span class="otag otag--bad">receipt NOT sent</span>' +
-    '<button type="button" class="oresend" data-resend="' + esc(o.id || '') + '">Send it now</button>';
+  if (o.receiptSent === true) return '<span class="otag">receipt sent</span>';
+  const btn = '<button type="button" class="oresend" data-resend="' + esc(o.id || '') + '">' +
+    (o.receiptSent === false ? 'Send it now' : 'Check / send') + '</button>';
+  /* Une commande d avant le suivi n a PAS echoue : on ne sait pas. Crier
+     au rouge ferait renvoyer des recus deja partis. */
+  if (o.receiptSent === false) return '<span class="otag otag--bad">receipt NOT sent</span>' + btn;
+  return '<span class="otag">receipt — status unknown</span>' + btn;
 }
 
 /* le mois de Montreal, pas celui du navigateur de qui regarde */
@@ -202,7 +206,8 @@ function render() {
         method: 'POST',
         body: JSON.stringify({ action: 'resend-receipt', month: MONTH, id: b.dataset.resend }),
       });
-      toast('Receipt sent to ' + j.sentTo);
+      toast(j.already ? 'Already sent to ' + j.sentTo + ' — recorded'
+                      : 'Receipt sent to ' + j.sentTo);
       await loadMonth(MONTH);
     } catch (e) {
       toast('Could not send: ' + e.message);
