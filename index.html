@@ -105,7 +105,14 @@
         <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
       </div>
       <div class="cover-top">
-        <span></span>
+        <!-- Le compte etait au fond de la feuille « Commander en ligne » :
+             personne n allait l y chercher. Il prend la place laissee vide
+             en face du selecteur de langue, visible des l arrivee. Masque
+             tant que /api/account ne repond pas, comme le paiement. -->
+        <button type="button" class="acct-top" id="acctTop" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M4.8 20c.6-3.6 3.6-5.6 7.2-5.6s6.6 2 7.2 5.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          <span data-i18n="accountEntry">Mes commandes</span>
+        </button>
         <div class="lang-switch" role="group" aria-label="Langue">
           <button data-setlang="fr" class="is-active" lang="fr">FR</button>
           <button data-setlang="en" lang="en">EN</button>

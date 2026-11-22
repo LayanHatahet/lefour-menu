@@ -144,6 +144,31 @@ button { font-family: inherit; background: none; border: none; color: inherit; c
   opacity: .68; text-align: start;
 }
 [dir="rtl"] .cover-place { letter-spacing: .02em; font-size: .72rem; }
+/* Meme pastille que le selecteur de langue, en face : deux objets de
+   meme poids de part et d autre du bandeau, rien qui crie. */
+.acct-top {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  border: 1px solid rgba(244, 236, 223, .34); border-radius: 99px;
+  background: rgba(28, 22, 17, .35);
+  backdrop-filter: blur(6px);
+  padding: 6px 13px; cursor: pointer;
+  font: inherit; font-size: .64rem; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: rgba(244, 236, 223, .82);
+  transition: background .25s, color .25s;
+}
+.acct-top:hover { background: rgba(28, 22, 17, .55); color: var(--ivory); }
+.acct-top svg { width: 15px; height: 15px; flex: none; }
+.acct-top.is-in { background: var(--ivory); color: var(--herbs); border-color: var(--ivory); }
+[dir="rtl"] .acct-top { letter-spacing: 0; font-size: .74rem; text-transform: none; }
+/* Le texte reste jusqu aux tres petits ecrans : c est lui qui rend le
+   compte trouvable, et a 375px (l iPhone courant) la place ne manque
+   pas — le selecteur de langue ne prend que 122px a droite. */
+@media (max-width: 339px) {
+  .acct-top span { display: none; }
+  .acct-top { padding: 7px 9px; }
+}
+
 .lang-switch {
   display: flex; border: 1px solid rgba(244, 236, 223, .34); border-radius: 99px; overflow: hidden;
   background: rgba(28, 22, 17, .35); flex: none;

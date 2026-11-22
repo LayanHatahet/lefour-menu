@@ -1281,6 +1281,8 @@ function accountRender() {
 
   const entry = $('#osAccountLabel');
   if (entry) entry.textContent = t('accountEntry');
+  const top = $('#acctTop');
+  if (top) top.classList.toggle('is-in', inAccount);
 
   if (!inAccount) {
     const go = $('#acGo'), sw = $('#acSwitch'), pw = $('#acPassword');
@@ -1325,6 +1327,8 @@ async function accountLoad() {
     ACCOUNT = j;
     const grp = $('#osAccountGroup');
     if (grp) grp.hidden = false;
+    const top = $('#acctTop');
+    if (top) top.hidden = false;
     accountRender();
   } catch (e) { /* le compte est un bonus : son absence ne casse rien */ }
 }
@@ -1346,6 +1350,9 @@ function bindAccount() {
   OPEN_ACCOUNT = open;
   $$('#acsheet [data-acclose]').forEach(el => el.addEventListener('click', close));
   addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+  const top = $('#acctTop');
+  if (top) top.addEventListener('click', () => { track('account_open_top'); open(); });
 
   const entry = $('#osAccount');
   if (entry) entry.addEventListener('click', () => {
