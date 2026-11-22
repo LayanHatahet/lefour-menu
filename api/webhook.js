@@ -15,6 +15,7 @@
 
 const crypto = require('crypto');
 const ORDERS = require('./_orders.js');
+const RECEIPT = require('./_receipt.js');
 
 const STRIPE_BASE = 'https://api.stripe.com/v1';
 
@@ -67,22 +68,6 @@ async function stripeGet(path) {
     throw err;
   }
   return j;
-}
-
-/* Le recu : Stripe l envoie lui-meme des qu une adresse est posee sur le
-   paiement. On ne la pose que si le client a coche oui. */
-async function sendReceipt(paymentIntentId, email) {
-  const r = await fetch(`${STRIPE_BASE}/payment_intents/${encodeURIComponent(paymentIntentId)}`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'content-type': 'application/x-www-form-urlencoded' },
-    body: `receipt_email=${encodeURIComponent(email)}`,
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    console.error('receipt not sent:', (j.error && j.error.message) || r.status);
-    return false;
-  }
-  return true;
 }
 
 function customField(session, key) {
@@ -155,6 +140,8 @@ async function buildOrder(session) {
     total: money(session.amount_total),
     currency: (session.currency || 'cad').toUpperCase(),
     mode: session.livemode ? 'live' : 'test',
+    /* de quoi renvoyer le recu depuis le releve, sans relire la session */
+    pi: session.payment_intent ? String(session.payment_intent) : '',
     source: 'web',
   };
 }
@@ -215,6 +202,30 @@ module.exports = async (req, res) => {
     }
 
     const order = await buildOrder(session);
+
+    /* LE RECU D ABORD. Il etait la derniere etape : le moindre incident en
+       amont le faisait sauter, et c est exactement ce qui est arrive le
+       19 novembre. Un client qui a coche « oui » doit le recevoir meme si
+       l enregistrement de la commande se passe mal ensuite.
+
+       Si Stripe rejoue l evenement, on ne renvoie pas un recu deja parti :
+       la commande deja enregistree porte la marque. */
+    const already = await ORDERS.findOrder(order.month, order.id).catch(() => null);
+    if (order.receipt && !(already && already.receiptSent)) {
+      Object.assign(order, await RECEIPT.sendReceipt(order.pi, order.email));
+      if (already) {
+        await ORDERS.patchOrder(order.month, order.id, {
+          receiptSent: order.receiptSent,
+          receiptAt: order.receiptAt || '',
+          receiptError: order.receiptError || '',
+        }).catch(e => console.error('receipt state not saved:', e && e.message));
+      }
+    } else if (already) {
+      order.receiptSent = already.receiptSent;
+      order.receiptAt = already.receiptAt;
+      order.receiptError = already.receiptError;
+    }
+
     const { added } = await ORDERS.addOrder(order);
 
     /* L historique personnel se remplit des maintenant, compte ou pas :
@@ -231,10 +242,10 @@ module.exports = async (req, res) => {
     try { await ORDERS.noteCustomerOrder(order); }
     catch (e) { console.error('customer history not updated:', e && e.message); }
 
-    if (added && order.receipt && order.email && session.payment_intent) {
-      await sendReceipt(String(session.payment_intent), order.email);
-    }
-    return res.status(200).json({ ok: true, added, ref: order.ref });
+    return res.status(200).json({
+      ok: true, added, ref: order.ref,
+      receipt: order.receipt ? (order.receiptSent ? 'sent' : 'failed') : 'not asked',
+    });
   } catch (e) {
     console.error('webhook failed:', e && e.message);
     if (e && e.permanent) return res.status(200).json({ skipped: 'unknown session' });

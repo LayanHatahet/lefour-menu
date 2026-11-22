@@ -38,11 +38,23 @@ function money(n) {
   return v.toFixed(2).replace('.', ',') + ' $';
 }
 
-async function api(path) {
-  const r = await fetch(path, { headers: { 'x-reports-key': KEY }, cache: 'no-store' });
+async function api(path, opts) {
+  const o = opts || {};
+  const headers = { 'x-reports-key': KEY };
+  if (o.body) headers['content-type'] = 'application/json';
+  const r = await fetch(path, { method: o.method || 'GET', body: o.body, headers, cache: 'no-store' });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
   return j;
+}
+
+/* Un recu demande et jamais parti doit sauter aux yeux : c est le seul
+   cas ou la boulangerie a quelque chose a faire. */
+function receiptBadge(o) {
+  if (!o.receipt) return '';
+  if (o.receiptSent) return '<span class="otag">receipt sent</span>';
+  return '<span class="otag otag--bad">receipt NOT sent</span>' +
+    '<button type="button" class="oresend" data-resend="' + esc(o.id || '') + '">Send it now</button>';
 }
 
 /* le mois de Montreal, pas celui du navigateur de qui regarde */
@@ -151,7 +163,7 @@ function card(o) {
       '<b>' + esc(o.name || '—') + '</b>' +
       (o.phone ? '<a href="tel:' + esc(o.phone) + '">' + esc(o.phone) + '</a>' : '') +
       (o.email ? '<a href="mailto:' + esc(o.email) + '">' + esc(o.email) + '</a>' : '') +
-      (o.receipt ? '<span class="otag">receipt sent</span>' : '') +
+      receiptBadge(o) +
     '</div>' +
     '<ul class="oitems">' + items + '</ul>' +
     (o.note ? '<p class="onote">“' + esc(o.note) + '”</p>' : '') +
@@ -180,6 +192,24 @@ function render() {
     ? shown.slice().reverse().map(card).join('')
     : '<p class="muted">No orders' + (DAY ? ' that day' : ' yet this month') +
       '. Card payments made on the website land here by themselves.</p>';
+
+  $$('#ordList [data-resend]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    const was = b.textContent;
+    b.textContent = 'Sending…';
+    try {
+      const j = await api('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'resend-receipt', month: MONTH, id: b.dataset.resend }),
+      });
+      toast('Receipt sent to ' + j.sentTo);
+      await loadMonth(MONTH);
+    } catch (e) {
+      toast('Could not send: ' + e.message);
+      b.disabled = false;
+      b.textContent = was;
+    }
+  }));
 }
 
 /* Le fichier est protege par le mot de passe, qu un lien ordinaire ne peut

@@ -7,6 +7,9 @@
 
 const ORDERS = require('./_orders.js');
 const XLSX = require('./_xlsx.js');
+const RECEIPT = require('./_receipt.js');
+
+const STRIPE_BASE = 'https://api.stripe.com/v1';
 
 /* Ces lignes portent le nom, le courriel et le telephone de vrais clients.
    Elles ne partagent donc pas le mot de passe du tableau de bord photos,
@@ -61,7 +64,7 @@ const COLUMNS = [
   { key: 'tps', label: 'TPS', type: 'money', width: 10 },
   { key: 'tvq', label: 'TVQ', type: 'money', width: 10 },
   { key: 'total', label: 'Total payé', type: 'money', width: 13 },
-  { key: 'receipt', label: 'Reçu demandé', width: 14 },
+  { key: 'receipt', label: 'Reçu', width: 18 },
   { key: 'lang', label: 'Langue', width: 9 },
   { key: 'mode', label: 'Mode', width: 9 },
 ];
@@ -82,7 +85,9 @@ function toRows(orders) {
     tps: o.tps,
     tvq: o.tvq,
     total: o.total,
-    receipt: o.receipt ? 'Oui' : 'Non',
+    receipt: !o.receipt ? 'Non demandé'
+      : o.receiptSent ? 'Envoyé'
+      : 'DEMANDÉ — non envoyé',
     lang: (o.lang || '').toUpperCase(),
     mode: o.mode || '',
   }));
@@ -91,8 +96,8 @@ function toRows(orders) {
 module.exports = async (req, res) => {
   res.setHeader('cache-control', 'no-store');
 
-  if (req.method !== 'GET') {
-    res.setHeader('allow', 'GET');
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.setHeader('allow', 'GET, POST');
     return res.status(405).json({ error: 'method not allowed' });
   }
   const want = reportsKey();
@@ -106,6 +111,48 @@ module.exports = async (req, res) => {
 
   const q = req.query || {};
   const month = String(q.month || '');
+
+  /* Renvoyer un recu. Sert aux commandes dont l envoi avait echoue, et a
+     celles d avant que l etat du recu soit suivi — pour celles-la
+     l identifiant du paiement n est pas sur la commande, on le redemande
+     a Stripe a partir de la session. */
+  if (req.method === 'POST') {
+    let body = {};
+    try { body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); }
+    catch (e) { return res.status(400).json({ error: 'bad request' }); }
+    if (String(body.action || '') !== 'resend-receipt') {
+      return res.status(400).json({ error: 'unknown action' });
+    }
+    const m = String(body.month || '');
+    const id = String(body.id || '');
+    if (!ORDERS.MONTH_RE.test(m)) return res.status(400).json({ error: 'bad month' });
+    if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(id)) return res.status(400).json({ error: 'bad order id' });
+
+    try {
+      const order = await ORDERS.findOrder(m, id);
+      if (!order) return res.status(404).json({ error: 'order not found' });
+      let pi = order.pi || '';
+      if (!pi) {
+        const r = await fetch(`${STRIPE_BASE}/checkout/sessions/${encodeURIComponent(id)}`, {
+          headers: { authorization: `Bearer ${process.env.STRIPE_SECRET_KEY || ''}` },
+        });
+        const j = await r.json().catch(() => ({}));
+        pi = j && j.payment_intent ? String(j.payment_intent) : '';
+      }
+      const out = await RECEIPT.sendReceipt(pi, order.email);
+      await ORDERS.patchOrder(m, id, {
+        pi: pi || order.pi || '',
+        receiptSent: out.receiptSent,
+        receiptAt: out.receiptAt || '',
+        receiptError: out.receiptError || '',
+      });
+      if (!out.receiptSent) return res.status(502).json({ error: out.receiptError || 'could not send' });
+      return res.status(200).json({ ok: true, sentTo: order.email });
+    } catch (e) {
+      console.error('resend failed:', e && e.message);
+      return res.status(503).json({ error: 'could not send' });
+    }
+  }
 
   try {
     if (!month) {

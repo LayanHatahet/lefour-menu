@@ -238,6 +238,26 @@ async function noteCustomerOrder(order) {
   await writeCustomer(order.email, rec);
 }
 
+/* Une commande deja enregistree, ou null. */
+async function findOrder(month, id) {
+  const book = await readMonth(month);
+  return (book.orders || []).find(o => o.id === id) || null;
+}
+
+/* Modifier quelques champs d une commande deja ecrite — l etat du recu,
+   rien d autre pour l instant. Comme partout ici, c est le fichier du mois
+   qui est reecrit en entier ; la commande elle-meme n est jamais touchee
+   dans son montant ni dans son contenu. */
+async function patchOrder(month, id, patch) {
+  const book = await readMonth(month);
+  const orders = book.orders || [];
+  const i = orders.findIndex(o => o.id === id);
+  if (i < 0) return false;
+  orders[i] = Object.assign({}, orders[i], patch);
+  await writeMonth(month, orders);
+  return true;
+}
+
 /* Les mois a proposer au tableau de bord.
 
    L index reste la voie rapide, mais il n est plus cru sur parole : il
@@ -268,5 +288,6 @@ async function monthsAvailable(back) {
 module.exports = {
   MONTH_RE, monthOf, dayOf, clockOf, montrealParts,
   readMonth, writeMonth, addOrder, readIndex, noteMonth, monthsAvailable, token,
+  findOrder, patchOrder,
   customerKey, readCustomer, writeCustomer, noteCustomerOrder,
 };
