@@ -744,11 +744,19 @@ function isOff(id) {
   return !!(m && m[id] && m[id].off);
 }
 
+/* Un plat qui n a qu un seul format est ajoute au panier SANS code de
+   format (voir cartAdd : le code n est stocke que s il y a un choix a
+   faire). Un format vide veut donc dire « regulier », et il faut le dire
+   partout ou la taxe est en jeu — sinon ces plats-la sont comptes dans
+   les six mais restent taxes, ce qui est exactement ce qui arrivait aux
+   huit manouches a format unique (kishik, makdous, duplex...). */
+function sizeOf(line) { return line.sizeKey || 'R'; }
+
 /* combien de manouches regulieres dans le panier, tous plats confondus */
 function regularCount() {
   let n = 0;
   for (const l of CART) {
-    if ((l.sizeKey || 'R') !== 'R') continue;
+    if (sizeOf(l) !== 'R') continue;
     if (catOf(l.id) !== 'manakish') continue;
     n += l.qty;
   }
@@ -775,7 +783,7 @@ function cartTaxes() {
   let taxed = 0, tps = 0, tvq = 0;
   for (const l of CART) {
     const cents = Math.round((l.price || 0) * 100) * l.qty;
-    if (!cents || !lineTaxable(l.id, l.sizeKey, bulk)) continue;
+    if (!cents || !lineTaxable(l.id, sizeOf(l), bulk)) continue;
     taxed += cents;
     tps += Math.round(cents * TPS_RATE);
     tvq += Math.round(cents * TVQ_RATE);
